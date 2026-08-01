@@ -18,7 +18,7 @@ http.interceptors.response.use(response => response.data, error => {
 })
 
 export const api = {
-  login: data => http.post('/api/auth/login', data), me: () => http.get('/api/auth/me'),
+  loginPublicKey: () => http.get('/api/auth/public-key'), login: data => http.post('/api/auth/login', data), me: () => http.get('/api/auth/me'),
   logoutAll: () => http.post('/api/auth/logout-all'), changePassword: data => http.post('/api/auth/change-password', data), resetPassword: data => http.post('/api/auth/reset-password', data), profile: data => http.put('/api/auth/profile', data),
   records: params => http.get('/api/work-records', { params }), record: data => http.post('/api/work-records', data), updateRecord: (id, data) => http.put(`/api/work-records/${id}`, data), deleteRecord: id => http.delete(`/api/work-records/${id}`),
   plans: params => http.get('/api/work-plans', { params }), plan: data => http.post('/api/work-plans', data), updatePlan: (id, data) => http.put(`/api/work-plans/${id}`, data), deletePlan: id => http.delete(`/api/work-plans/${id}`),

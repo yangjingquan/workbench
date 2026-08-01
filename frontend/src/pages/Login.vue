@@ -3,6 +3,8 @@
 </template>
 <script setup>
 import { reactive, ref } from 'vue'; import { useRouter } from 'vue-router'; import { ElMessage } from 'element-plus'; import { User, Lock, Right } from '@element-plus/icons-vue'; import { api } from '../api/http'; import { useAppStore } from '../stores'
-const form = reactive({ username: 'admin', password: 'admin123' }); const loading = ref(false); const router = useRouter(); const app = useAppStore()
-async function submit() { if (!form.username || !form.password) return ElMessage.warning('请输入用户名和密码'); loading.value = true; try { const res = await api.login(form); app.setSession(res.data); router.push('/dashboard'); ElMessage.success('欢迎回来') } finally { loading.value = false } }
+const form = reactive({ username: '', password: '' }); const loading = ref(false); const router = useRouter(); const app = useAppStore()
+function pemToArrayBuffer(pem) { const base64 = pem.replace(/-----(BEGIN|END) PUBLIC KEY-----/g, '').replace(/\s/g, ''); const binary = atob(base64); const bytes = new Uint8Array(binary.length); for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index); return bytes.buffer }
+async function encryptPassword(password, pem) { const key = await window.crypto.subtle.importKey('spki', pemToArrayBuffer(pem), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']); const encrypted = await window.crypto.subtle.encrypt({ name: 'RSA-OAEP' }, key, new TextEncoder().encode(password)); const bytes = new Uint8Array(encrypted); let binary = ''; bytes.forEach(byte => { binary += String.fromCharCode(byte) }); return btoa(binary) }
+async function submit() { if (!form.username || !form.password) return ElMessage.warning('请输入用户名和密码'); loading.value = true; try { const keyRes = await api.loginPublicKey(); const encryptedPassword = await encryptPassword(form.password, keyRes.data.public_key); const res = await api.login({ username: form.username, encrypted_password: encryptedPassword }); app.setSession(res.data); router.push('/dashboard'); ElMessage.success('欢迎回来') } finally { loading.value = false } }
 </script>

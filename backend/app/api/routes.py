@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api.common import ok
 from app.api.deps import get_current_user
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import create_access_token, decrypt_login_password, hash_password, login_public_key, verify_password
 from app.db.session import get_db
 from app.models import AccountCategory, AccountEntry, EventReminder, Memo, QuickLink, SystemConfig, TodoSubtask, TodoTask, ToolUsageLog, User, WorkPlan, WorkRecord
 
@@ -114,7 +114,7 @@ def dump(obj: Any, exclude: set[str] | None = None) -> dict:
 
 class LoginIn(BaseModel):
     username: str
-    password: str
+    encrypted_password: str = Field(min_length=1)
 
 
 class PasswordIn(BaseModel):
@@ -210,11 +210,20 @@ class MemoIn(BaseModel):
 
 @router.post("/auth/login")
 def login(payload: LoginIn, db: Session = Depends(get_db)):
+    try:
+        password = decrypt_login_password(payload.encrypted_password)
+    except ValueError:
+        raise HTTPException(400, "登录参数无效，请刷新页面后重试")
     user = db.scalar(select(User).where(User.username == payload.username))
-    if not user or not verify_password(payload.password, user.password_hash):
+    if not user or not verify_password(password, user.password_hash):
         raise HTTPException(401, "用户名或密码错误")
     token = create_access_token(user.id, user.token_version)
     return ok({"token": token, "user": dump(user, {"password_hash", "token_version"})})
+
+
+@router.get("/auth/public-key")
+def auth_public_key():
+    return ok({"public_key": login_public_key()})
 
 
 @router.get("/auth/me")

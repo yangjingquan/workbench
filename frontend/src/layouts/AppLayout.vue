@@ -20,7 +20,8 @@
         <div class="breadcrumb"><span class="eyebrow">PERSONAL OS</span><span class="slash">/</span><span>{{ route.meta.title || '总览看板' }}</span></div>
         <div class="top-actions">
           <button class="icon-button" title="全局检索" @click="searchOpen = true"><el-icon><Search /></el-icon></button>
-          <button class="icon-button" title="切换主题" @click="app.toggleTheme()"><el-icon><Moon v-if="app.theme === 'light'" /><Sunny v-else /></el-icon></button>
+          <button class="icon-button" title="切换主题模式" aria-label="切换浅色或暗黑模式" @click="app.toggleTheme()"><el-icon><Moon v-if="app.theme === 'light'" /><Sunny v-else /></el-icon></button>
+          <button class="icon-button accent-toggle" :title="app.accentTheme === 'indigo' ? '切换到天蓝青绿' : '切换到蓝紫品牌'" :aria-label="app.accentTheme === 'indigo' ? '切换到天蓝青绿主题' : '切换到蓝紫品牌主题'" @click="app.toggleAccentTheme()"><span :class="['accent-swatch', app.accentTheme]" /></button>
           <el-dropdown trigger="click" @command="handleUserCommand"><div class="avatar-wrap"><el-avatar :size="34" :src="app.user?.avatar_url || ''">{{ (app.user?.display_name || '管')[0] }}</el-avatar><span class="online-dot" /></div><template #dropdown><el-dropdown-menu><el-dropdown-item command="profile">个人中心</el-dropdown-item><el-dropdown-item divided command="logout">退出登录</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
         </div>
       </header>

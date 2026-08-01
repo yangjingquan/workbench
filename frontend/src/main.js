@@ -5,6 +5,9 @@ import 'element-plus/dist/index.css'
 import './styles.css'
 import App from './App.vue'
 import router from './router'
+import { useAppStore } from './stores'
 
-createApp(App).use(createPinia()).use(router).use(ElementPlus).mount('#app')
+const pinia = createPinia()
+useAppStore(pinia).initTheme()
 
+createApp(App).use(pinia).use(router).use(ElementPlus).mount('#app')

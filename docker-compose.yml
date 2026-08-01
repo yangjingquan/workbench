@@ -1,0 +1,43 @@
+name: workbench
+
+services:
+  workbench-api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: workbench-api:latest
+    container_name: workbench-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD}@xp-mysql:3306/${MYSQL_DATABASE:-workbench}?charset=utf8mb4
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://workbench.nexbyte.top,http://localhost:5173,http://localhost:5174,null}
+    ports:
+      - "18082:8100"
+    networks:
+      - workbench-internal
+      - shop-net
+
+  workbench-web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-http://wbapi.nexbyte.top}
+    image: workbench-web:latest
+    container_name: workbench-web
+    restart: unless-stopped
+    ports:
+      - "18083:80"
+    depends_on:
+      - workbench-api
+    networks:
+      - workbench-internal
+
+networks:
+  workbench-internal:
+    name: workbench-internal
+  shop-net:
+    external: true
+    name: shop_shop-net

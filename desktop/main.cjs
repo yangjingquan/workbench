@@ -4,7 +4,9 @@ const path = require('node:path')
 const { spawn } = require('node:child_process')
 const http = require('node:http')
 
-const API_URL = 'http://127.0.0.1:8100'
+// 桌面客户端默认连接线上 API；本地联调时可通过 WORKBENCH_API_URL 覆盖。
+const API_URL = process.env.WORKBENCH_API_URL || 'http://wbapi.nexbyte.top'
+const USE_LOCAL_BACKEND = ['127.0.0.1', 'localhost'].includes(new URL(API_URL).hostname)
 let mainWindow
 let backendProcess
 
@@ -44,6 +46,7 @@ function backendCandidates() {
 }
 
 async function startBackendIfNeeded() {
+  if (!USE_LOCAL_BACKEND) return true
   if (await backendIsReady()) return true
   const candidate = backendCandidates()[0]
   if (!candidate) return false
@@ -83,7 +86,7 @@ async function createWindow() {
   configureExternalNavigation(mainWindow)
   const renderer = path.join(__dirname, 'renderer', 'index.html')
   await mainWindow.loadFile(renderer)
-  if (!backendProcess && !(await backendIsReady())) {
+  if (USE_LOCAL_BACKEND && !backendProcess && !(await backendIsReady())) {
     dialog.showMessageBox(mainWindow, { type: 'warning', title: '后端服务未启动', message: 'Workbench 客户端已打开，但本机 FastAPI 后端或 MySQL 未启动。请先启动后端服务后刷新页面。' })
   }
 }

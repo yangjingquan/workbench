@@ -86,6 +86,10 @@ npm run build
 npm run preview
 ```
 
+线上 HTTP 部署使用 `http://wbapi.nexbyte.top` 作为 API 地址；该配置已写入
+`.env.production` 和 `.env.desktop`。本地开发仍保留 Vite 代理，不会影响
+`http://localhost:5173` 的联调方式。
+
 ### 4. 打包 macOS 客户端
 
 桌面端使用 Electron，前端以 Hash 路由运行，避免 `file://` 加载时刷新页面丢失路由。快捷导航、提醒备注中的网址、页面里通过新窗口打开的外部链接，都会交给 macOS 默认浏览器处理；工作台内部页面仍在客户端窗口内切换。
@@ -117,11 +121,13 @@ npm run package:mac:arm64   # Apple Silicon
 npm run package:mac:x64     # Intel Mac
 ```
 
-安装包输出在 `desktop/dist/`。桌面客户端仍使用本机 MySQL 数据库；要分发给没有 Python 环境的其他 Mac，可先用 PyInstaller 将后端打成 `workbench-api` 可执行文件并放入 `desktop/backend-resources/`，桌面主进程会优先启动它；否则请配置 `WORKBENCH_PYTHON` 或继续让客户端连接一台内网后端服务。
+安装包输出在 `desktop/dist/`。当前桌面生产包默认连接线上
+`http://wbapi.nexbyte.top`，不要求客户端安装本地 MySQL 或 Python；本地联调时可设置
+`WORKBENCH_API_URL=http://127.0.0.1:8100`，桌面主进程会再尝试启动本地后端。
 
 ## 功能说明
 
-- 登录体系：bcrypt 密码存储、JWT、前端路由守卫、Axios 自动注入 Token；修改密码或「强制下线所有设备」会递增 `token_version`，立即让旧 Token 失效。
+- 登录体系：密码在前端使用 RSA-OAEP 密文传输，HTTP 非安全上下文自动使用纯 JavaScript RSA fallback，后端仅接收密文并以 bcrypt 存储密码；同时提供 JWT、前端路由守卫、Axios 自动注入 Token。修改密码或「强制下线所有设备」会递增 `token_version`，立即让旧 Token 失效。
 - 个性化设置：主题、侧边栏、默认提醒、默认视图和工作时段写入 `system_config`，同时使用浏览器缓存保证首屏体验。
 - 工作记录：列表/日历、日期筛选、关键词检索、标签、工时、编辑删除、Markdown 日报导出。
 - 工作计划：起止日期、优先级和状态，支持按月份查看。

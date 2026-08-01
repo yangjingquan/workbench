@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from typing import Any

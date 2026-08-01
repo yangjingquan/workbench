@@ -11,7 +11,7 @@ http.interceptors.response.use(response => response.data, error => {
   if (error.response?.status === 401) {
     localStorage.removeItem('workbench_token')
     localStorage.removeItem('workbench_user')
-    if (location.pathname !== '/login') location.href = '/login'
+    if (location.pathname !== '/login' && !location.hash.endsWith('/login')) location.href = import.meta.env.VITE_DESKTOP === 'true' ? '#/login' : '/login'
   }
   ElMessage.error(error.response?.data?.msg || '网络请求失败')
   return Promise.reject(error)

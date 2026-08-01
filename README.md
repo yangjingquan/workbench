@@ -24,6 +24,10 @@ frontend/
   src/stores/ Pinia 登录、主题、布局状态
   src/layouts/全局侧边栏+内容布局
   src/pages/  登录、看板及八大模块页面
+desktop/
+  main.cjs    Electron 主进程与默认浏览器跳转处理
+  preload.cjs 安全隔离的桌面能力入口
+  build.mjs   复制桌面生产版前端资源
 ```
 
 ## 环境准备
@@ -41,7 +45,7 @@ mysql -uroot -pchangeme_root < backend/sql/init.sql
 ```env
 DATABASE_URL=mysql+pymysql://用户名:密码@127.0.0.1:3306/数据库名?charset=utf8mb4
 JWT_SECRET_KEY=换成随机长字符串
-CORS_ORIGINS=http://localhost:5173
+CORS_ORIGINS=http://localhost:5173,http://localhost:5174,null
 ```
 
 ### 2. 启动后端
@@ -81,6 +85,39 @@ npm run dev
 npm run build
 npm run preview
 ```
+
+### 4. 打包 macOS 客户端
+
+桌面端使用 Electron，前端以 Hash 路由运行，避免 `file://` 加载时刷新页面丢失路由。快捷导航、提醒备注中的网址、页面里通过新窗口打开的外部链接，都会交给 macOS 默认浏览器处理；工作台内部页面仍在客户端窗口内切换。
+
+先确认 MySQL 已启动，并在开发机完成后端虚拟环境安装：
+
+```bash
+cd backend
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+安装 Electron 打包依赖并启动桌面客户端：
+
+```bash
+cd desktop
+npm install
+npm start
+```
+
+`npm start` 会构建桌面版前端并启动 Electron。启动时如果 `8100` 后端已经运行会直接复用；如果当前项目的 `backend/.venv/bin/python` 可用，会尝试自动启动 FastAPI。
+
+生成 macOS 安装包：
+
+```bash
+cd desktop
+npm run package:mac          # 当前机器架构的 DMG 和 ZIP
+npm run package:mac:arm64   # Apple Silicon
+npm run package:mac:x64     # Intel Mac
+```
+
+安装包输出在 `desktop/dist/`。桌面客户端仍使用本机 MySQL 数据库；要分发给没有 Python 环境的其他 Mac，可先用 PyInstaller 将后端打成 `workbench-api` 可执行文件并放入 `desktop/backend-resources/`，桌面主进程会优先启动它；否则请配置 `WORKBENCH_PYTHON` 或继续让客户端连接一台内网后端服务。
 
 ## 功能说明
 

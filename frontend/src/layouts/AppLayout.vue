@@ -1,7 +1,7 @@
 <template>
   <div class="app-shell">
     <aside class="sidebar" :class="{ collapsed: app.collapsed }">
-      <div class="brand"><div class="brand-mark">⌘</div><div v-if="!app.collapsed" class="brand-copy"><b>Workbench</b><span>个人工作台</span></div></div>
+      <div class="brand"><div class="brand-mark">⌘</div><div v-if="!app.collapsed" class="brand-copy"><b>Workbench</b><span>小胖的工作台</span></div></div>
       <nav class="nav-list">
         <div class="nav-section" v-if="!app.collapsed">WORKSPACE</div>
         <RouterLink v-for="item in mainNav" :key="item.path" :to="item.path" class="nav-item"><el-icon><component :is="item.icon" /></el-icon><span v-if="!app.collapsed">{{ item.label }}</span></RouterLink>

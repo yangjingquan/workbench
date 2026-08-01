@@ -1,0 +1,35 @@
+{
+  "name": "dev-workbench-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Workbench macOS desktop client",
+  "main": "main.cjs",
+  "scripts": {
+    "build:renderer": "npm --prefix ../frontend run build:desktop && node build.mjs",
+    "start": "npm run build:renderer && electron .",
+    "package:mac": "npm run build:renderer && electron-builder --mac dmg zip",
+    "package:mac:arm64": "npm run build:renderer && electron-builder --mac dmg --arm64",
+    "package:mac:x64": "npm run build:renderer && electron-builder --mac dmg --x64"
+  },
+  "devDependencies": {
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.workbench.personal",
+    "productName": "Workbench",
+    "asar": true,
+    "directories": { "output": "dist" },
+    "files": ["main.cjs", "preload.cjs", "renderer/**/*"],
+    "extraResources": [
+      { "from": "backend-resources", "to": "backend" },
+      { "from": "../backend/app", "to": "backend/app" },
+      { "from": "../backend/sql", "to": "backend/sql" }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "zip"],
+      "artifactName": "Workbench-${version}-${arch}.${ext}"
+    }
+  }
+}

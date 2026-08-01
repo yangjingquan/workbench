@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import { useAppStore } from '../stores'
 
 const routes = [
@@ -18,6 +18,6 @@ const routes = [
     { path: 'settings', component: () => import('../pages/Settings.vue'), meta: { title: '系统设置' } }
   ]}
 ]
-const router = createRouter({ history: createWebHistory(), routes })
+const router = createRouter({ history: import.meta.env.VITE_DESKTOP === 'true' ? createWebHashHistory() : createWebHistory(), routes })
 router.beforeEach(to => { const store = useAppStore(); store.initTheme(); if (!to.meta.public && !store.isLoggedIn) return '/login'; if (to.path === '/login' && store.isLoggedIn) return '/dashboard' })
 export default router

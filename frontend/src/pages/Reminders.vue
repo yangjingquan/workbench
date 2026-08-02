@@ -4,7 +4,7 @@
     <div class="page-actions"><el-button @click="enableNotifications">开启桌面通知</el-button><el-button type="primary" @click="openCreate">+ 新建提醒</el-button></div>
   </div>
 
-  <div class="table-card">
+  <div class="desktop-table table-card">
     <el-table :data="rows" stripe>
       <el-table-column prop="title" label="提醒事项" min-width="190" />
       <el-table-column label="规则" min-width="280"><template #default="scope"><b>{{ scheduleText(scope.row) }}</b><div v-if="scope.row.content" class="muted-text"><a v-if="isUrl(scope.row.content)" class="reminder-link" :href="normalizeUrl(scope.row.content)" target="_blank" rel="noopener noreferrer" @click.stop>{{ scope.row.content }}</a><span v-else>{{ scope.row.content }}</span></div><div v-else class="muted-text">无备注</div></template></el-table-column>
@@ -12,6 +12,16 @@
       <el-table-column label="状态" width="100"><template #default="scope"><span :class="['status-tag', scope.row.status === 'closed' ? 'muted-status' : '']">{{ statusLabel(scope.row) }}</span></template></el-table-column>
       <el-table-column label="操作" width="245" fixed="right"><template #default="scope"><el-button link type="primary" @click="openEdit(scope.row)">编辑</el-button><el-button v-if="scope.row.status === 'active'" link type="warning" @click="action(scope.row.id, 'close')">关闭</el-button><el-button v-else link type="success" @click="action(scope.row.id, 'activate')">启用</el-button><el-button link type="danger" @click="action(scope.row.id, 'delete')">删除</el-button></template></el-table-column>
     </el-table>
+    <el-empty v-if="!rows.length" description="还没有事件提醒" />
+  </div>
+
+  <div class="mobile-card-list">
+    <article v-for="row in rows" :key="row.id" class="mobile-reminder-card mobile-content-card">
+      <div class="mobile-card-header"><h3>{{ row.title }}</h3><span :class="['status-tag', row.status === 'closed' ? 'muted-status' : '']">{{ statusLabel(row) }}</span></div>
+      <b class="mobile-card-rule">{{ scheduleText(row) }}</b>
+      <p v-if="row.content" class="mobile-card-description"><a v-if="isUrl(row.content)" class="reminder-link" :href="normalizeUrl(row.content)" target="_blank" rel="noopener noreferrer">{{ row.content }}</a><span v-else>{{ row.content }}</span></p>
+      <div class="mobile-card-actions"><el-button link type="primary" @click="openEdit(row)">编辑</el-button><el-button v-if="row.status === 'active'" link type="warning" @click="action(row.id, 'close')">关闭</el-button><el-button v-else link type="success" @click="action(row.id, 'activate')">启用</el-button><el-button link type="danger" @click="action(row.id, 'delete')">删除</el-button></div>
+    </article>
     <el-empty v-if="!rows.length" description="还没有事件提醒" />
   </div>
 

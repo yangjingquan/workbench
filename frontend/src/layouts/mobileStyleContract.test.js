@@ -24,3 +24,11 @@ test('mobile styles provide 40px touch targets and reduced-motion drawer behavio
   assert.match(styles, /\.el-radio-button__inner,[\s\S]*?\.el-segmented,[\s\S]*?\.el-switch,[\s\S]*?\.memo-item\s*\{[^}]*min-height:\s*40px/)
   assert.match(styles, /@media \(prefers-reduced-motion:\s*reduce\)[\s\S]*?\.mobile-nav-enter-active,[\s\S]*?\.mobile-nav-leave-active/)
 })
+
+test('mobile content overrides remove list-page overflow and center controls', () => {
+  assert.match(styles, /\.mobile-nav-panel\s*\{[^}]*width:\s*min\(300px,\s*50vw\)/)
+  assert.match(styles, /\.desktop-table\s*\{[^}]*display:\s*none/)
+  assert.match(styles, /\.mobile-card-list\s*\{[^}]*display:\s*flex/)
+  assert.match(styles, /\.link-grid\s*\{[^}]*grid-template-columns:\s*1fr/)
+  assert.match(styles, /\.el-radio-button__inner\s*\{[^}]*display:\s*inline-flex[^}]*align-items:\s*center[^}]*justify-content:\s*center/)
+})

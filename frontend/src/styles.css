@@ -290,8 +290,11 @@ button:focus-visible, a:focus-visible { outline-color: var(--primary); }
   .breadcrumb { min-width: 0; gap: 8px; font-size: 13px; }
   .breadcrumb > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .top-actions { gap: 2px; }
-  .icon-button { width: 34px; height: 34px; }
-  .avatar-wrap { margin-left: 2px; }
+  .icon-button, .mobile-menu-button, .mobile-nav-close, .top-actions .el-dropdown { min-width: 40px; min-height: 40px; }
+  .avatar-wrap { display: grid; place-items: center; min-width: 40px; min-height: 40px; margin-left: 2px; }
+  .el-button { min-height: 40px; }
+  .el-input__wrapper, .el-select__wrapper, .el-date-editor, .el-time-editor, .el-date-editor .el-input__wrapper, .el-time-editor .el-input__wrapper { min-height: 40px; }
+  .el-radio-button__inner, .el-segmented, .el-switch, .memo-item { min-height: 40px; }
   .content-scroll { padding: 20px 16px 32px; }
   .page-heading { align-items: flex-start; flex-direction: column; gap: 14px; margin-bottom: 20px; }
   .page-heading h1 { font-size: 22px; }
@@ -325,4 +328,8 @@ button:focus-visible, a:focus-visible { outline-color: var(--primary); }
   .el-dialog { width: calc(100vw - 32px) !important; margin: 0 auto; }
   .el-dialog__body { padding: 0 16px 16px; }
   .el-dialog__footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-nav-enter-active, .mobile-nav-leave-active, .mobile-nav-enter-active .mobile-nav-panel, .mobile-nav-leave-active .mobile-nav-panel { transition: none; }
 }

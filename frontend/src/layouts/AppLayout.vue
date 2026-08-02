@@ -17,7 +17,7 @@
     </aside>
     <main class="main-area">
       <header class="topbar">
-        <button class="mobile-menu-button" type="button" aria-label="打开移动端导航" @click="toggleMobileMenu">
+        <button ref="mobileMenuTrigger" class="mobile-menu-button" type="button" aria-label="打开移动端导航" :aria-expanded="mobileNav.open" aria-controls="mobile-nav-panel" @click="toggleMobileMenu">
           <el-icon><Menu /></el-icon>
         </button>
         <div class="breadcrumb"><span class="eyebrow">PERSONAL OS</span><span class="slash">/</span><span>{{ route.meta.title || '总览看板' }}</span></div>
@@ -31,12 +31,12 @@
       <section class="content-scroll"><RouterView /></section>
     </main>
     <Transition name="mobile-nav">
-      <div v-if="mobileNav.open" class="mobile-nav-layer">
+      <div v-if="mobileNav.open" class="mobile-nav-layer" @keydown="handleMobileNavKeydown">
         <button class="mobile-nav-backdrop" type="button" aria-label="关闭移动端导航" @click="closeMobileMenu" />
-        <aside class="mobile-nav-panel" aria-label="移动端导航">
+        <aside id="mobile-nav-panel" ref="mobileNavPanel" class="mobile-nav-panel" role="dialog" aria-modal="true" aria-label="移动端导航" tabindex="-1">
           <div class="mobile-nav-header">
             <div class="brand"><div class="brand-mark">⌘</div><div class="brand-copy"><b>Workbench</b><span>小胖的工作台</span></div></div>
-            <button class="mobile-nav-close" type="button" aria-label="关闭移动端导航" @click="closeMobileMenu"><el-icon><Close /></el-icon></button>
+            <button ref="mobileNavClose" class="mobile-nav-close" type="button" aria-label="关闭移动端导航" @click="closeMobileMenu"><el-icon><Close /></el-icon></button>
           </div>
           <nav class="mobile-nav-list">
             <RouterLink v-for="item in mainNav" :key="item.path" :to="item.path" class="nav-item" @click="closeMobileMenu"><el-icon><component :is="item.icon" /></el-icon><span>{{ item.label }}</span></RouterLink>
@@ -54,7 +54,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAppStore } from '../stores'
@@ -64,8 +64,39 @@ import { createMobileNavState, toggleMobileNav, closeMobileNav } from './mobileN
 import { Odometer, Calendar, Bell, List, Link, Tools, Wallet, Memo, Setting, Search, Moon, Sunny, DArrowLeft, DArrowRight, Menu, Close } from '@element-plus/icons-vue'
 const app = useAppStore(); const route = useRoute(); const router = useRouter(); const searchOpen = ref(false); const keyword = ref(''); const results = ref(null)
 const mobileNav = reactive(createMobileNavState())
-function toggleMobileMenu() { Object.assign(mobileNav, toggleMobileNav(mobileNav)) }
-function closeMobileMenu() { Object.assign(mobileNav, closeMobileNav(mobileNav)) }
+const mobileMenuTrigger = ref(null)
+const mobileNavClose = ref(null)
+const mobileNavPanel = ref(null)
+const mobileNavFocusableSelector = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+function getMobileNavFocusableElements() { return mobileNavPanel.value ? [...mobileNavPanel.value.querySelectorAll(mobileNavFocusableSelector)] : [] }
+async function focusMobileNav() {
+  await nextTick()
+  if (!mobileNav.open) return
+  if (mobileNavClose.value) { mobileNavClose.value?.focus(); return }
+  getMobileNavFocusableElements()[0]?.focus()
+}
+function restoreMobileMenuTriggerFocus() { if (mobileMenuTrigger.value?.isConnected) mobileMenuTrigger.value?.focus() }
+function toggleMobileMenu() {
+  Object.assign(mobileNav, toggleMobileNav(mobileNav))
+  if (mobileNav.open) void focusMobileNav()
+  else restoreMobileMenuTriggerFocus()
+}
+function closeMobileMenu() {
+  const wasOpen = mobileNav.open
+  Object.assign(mobileNav, closeMobileNav(mobileNav))
+  if (wasOpen) restoreMobileMenuTriggerFocus()
+}
+function handleMobileNavKeydown(event) {
+  if (event.key === 'Escape') { event.preventDefault(); closeMobileMenu(); return }
+  if (event.key !== 'Tab') return
+  const focusableElements = getMobileNavFocusableElements()
+  if (!focusableElements.length) { event.preventDefault(); mobileNavPanel.value?.focus(); return }
+  const first = focusableElements[0]
+  const last = focusableElements[focusableElements.length - 1]
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); return }
+  if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); return }
+  if (!mobileNavPanel.value?.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus() }
+}
 watch(() => route.fullPath, closeMobileMenu)
 const mainNav = [{ path: '/dashboard', label: '总览看板', icon: Odometer }, { path: '/records', label: '工作记录', icon: List }, { path: '/plans', label: '工作计划', icon: Calendar }, { path: '/reminders', label: '事件提醒', icon: Bell }, { path: '/todos', label: 'Todo 看板', icon: List }, { path: '/links', label: '快捷导航', icon: Link }]
 const groupNames = { records: '工作记录', plans: '计划', todos: '待办', links: '链接', memos: '备忘录' }

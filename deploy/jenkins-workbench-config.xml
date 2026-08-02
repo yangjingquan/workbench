@@ -157,7 +157,8 @@ pipeline {
             echo "Check passed: $check_name"
           }
           check_contains 'direct frontend feature marker' 'name="workbench-feature" content="accent-themes"' "$FRONTEND_HTML"
-          check_contains 'direct frontend build marker' "name=\"workbench-build\" content=\"$BUILD_ID\"" "$FRONTEND_HTML"
+          BUILD_MARKER=$(printf 'name="workbench-build" content="%s"' "$BUILD_ID")
+          check_contains 'direct frontend build marker' "$BUILD_MARKER" "$FRONTEND_HTML"
           if PROXY_RESPONSE=$(curl --noproxy '*' -sS --max-time 20 --resolve "workbench.nexbyte.top:80:${HOST_GATEWAY}" -w '\n__HTTP_STATUS__=%{http_code}' "http://workbench.nexbyte.top/?v=${BUILD_ID}" 2>&1); then
             :
           else
@@ -166,7 +167,7 @@ pipeline {
             exit 1
           fi
           check_contains 'frontend proxy HTTP status' '__HTTP_STATUS__=200' "$PROXY_RESPONSE"
-          check_contains 'frontend proxy build marker' "name=\"workbench-build\" content=\"$BUILD_ID\"" "$PROXY_RESPONSE"
+          check_contains 'frontend proxy build marker' "$BUILD_MARKER" "$PROXY_RESPONSE"
           if API_RESPONSE=$(curl --noproxy '*' -sS --max-time 20 --resolve "wbapi.nexbyte.top:80:${HOST_GATEWAY}" -w '\n__HTTP_STATUS__=%{http_code}' "http://wbapi.nexbyte.top/health" 2>&1); then
             :
           else

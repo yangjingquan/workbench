@@ -99,7 +99,7 @@ pipeline {
         sh '''
           set -eu
           cd "$DEPLOY_DIR"
-          docker compose --project-name workbench up -d --build workbench-api workbench-web
+          VITE_BUILD_ID=$(git -C "$HOST_WORKSPACE" rev-parse --short HEAD) docker compose --project-name workbench up -d --build workbench-api workbench-web
           if docker ps -a --format '{{.Names}}' | grep -qx workbench-db; then docker rm -f workbench-db; fi
         '''
       }
@@ -131,8 +131,11 @@ pipeline {
             if [ "$attempt" -eq 30 ]; then exit 1; fi
             sleep 2
           done
-          curl -fsS --max-time 20 "http://${HOST_GATEWAY}:18083/" >/dev/null
-          curl -fsS --max-time 20 -H 'Host: workbench.nexbyte.top' "http://${HOST_GATEWAY}/" >/dev/null
+          BUILD_ID=$(git -C "$HOST_WORKSPACE" rev-parse --short HEAD)
+          FRONTEND_HTML=$(curl -fsS --max-time 20 "http://${HOST_GATEWAY}:18083/")
+          printf '%s' "$FRONTEND_HTML" | grep -Fq 'name="workbench-feature" content="accent-themes"'
+          printf '%s' "$FRONTEND_HTML" | grep -Fq "name=\"workbench-build\" content=\"$BUILD_ID\""
+          curl -fsS --max-time 20 -H 'Host: workbench.nexbyte.top' "http://${HOST_GATEWAY}/" | grep -Fq 'name="workbench-feature" content="accent-themes"'
           curl -fsS --max-time 20 -H 'Host: wbapi.nexbyte.top' "http://${HOST_GATEWAY}/health" >/dev/null
         '''
       }

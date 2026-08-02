@@ -8,6 +8,8 @@ RUN npm config set registry "${NPM_REGISTRY}" && npm ci --no-audit --no-fund
 COPY frontend/ ./
 ARG VITE_API_BASE=http://wbapi.nexbyte.top
 ENV VITE_API_BASE=${VITE_API_BASE}
+ARG VITE_BUILD_ID=dev
+ENV VITE_BUILD_ID=${VITE_BUILD_ID}
 RUN npm run build
 
 FROM nginx:1.27-alpine

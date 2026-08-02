@@ -11,21 +11,50 @@
     <script><![CDATA[
 pipeline {
   agent any
+
+  parameters {
+    string(name: 'BRANCH', defaultValue: 'main', description: '要部署的 Git 分支')
+  }
+
   options {
     disableConcurrentBuilds()
     timeout(time: 45, unit: 'MINUTES')
   }
   environment {
     DEPLOY_DIR = '/opt/shop/workbench'
+    HOST_WORKSPACE = '/opt/jenkins/jenkins_home/workspace/workbench'
   }
   stages {
-    stage('Validate source') {
+    stage('Validate') {
+      steps {
+        script {
+          if (!params.BRANCH?.trim()) {
+            error('BRANCH 不能为空')
+          }
+          if (params.BRANCH.contains('..') || params.BRANCH.contains(' ') || params.BRANCH.startsWith('/') || params.BRANCH.endsWith('/')) {
+            error("非法分支名：${params.BRANCH}")
+          }
+        }
+      }
+    }
+    stage('Checkout') {
+      steps {
+        deleteDir()
+        sh '''
+          set -eu
+          git clone --depth 1 --single-branch --branch "$BRANCH" https://gh-proxy.com/https://github.com/yangjingquan/workbench.git .
+          git rev-parse --short HEAD
+        '''
+      }
+    }
+    stage('Sync deployment files') {
       steps {
         sh '''
           set -eu
-          test -f "$DEPLOY_DIR/docker-compose.yml"
-          test -f "$DEPLOY_DIR/backend/sql/init.sql"
-          test -f "$DEPLOY_DIR/deploy/nginx/workbench.conf"
+          docker run --rm \
+            -v "$HOST_WORKSPACE:/source:ro" \
+            -v "$DEPLOY_DIR:/target" \
+            alpine:3.20 sh -c 'cp -a /source/. /target/'
         '''
       }
     }
@@ -80,7 +109,7 @@ pipeline {
         sh '''
           set -eu
           cd "$DEPLOY_DIR"
-          docker compose --project-name workbench up -d --build workbench-api workbench-web
+          VITE_BUILD_ID=$(git -C "$HOST_WORKSPACE" rev-parse --short HEAD) docker compose --project-name workbench up -d --build workbench-api workbench-web
           if docker ps -a --format '{{.Names}}' | grep -qx workbench-db; then docker rm -f workbench-db; fi
         '''
       }
@@ -91,7 +120,7 @@ pipeline {
           set -eu
           docker run --rm \
             -v /opt/jenkins/nginx/conf.d:/target \
-            -v "$DEPLOY_DIR/deploy/nginx/workbench.conf:/source/workbench.conf:ro" \
+            -v "$HOST_WORKSPACE/deploy/nginx/workbench.conf:/source/workbench.conf:ro" \
             alpine:3.20 sh -c 'cp /source/workbench.conf /target/workbench.conf'
           docker exec ai-shop-jenkins-proxy nginx -t
           docker exec ai-shop-jenkins-proxy nginx -s reload
@@ -110,8 +139,11 @@ pipeline {
             if [ "$attempt" -eq 30 ]; then exit 1; fi
             sleep 2
           done
-          curl -fsS --max-time 20 "http://${HOST_GATEWAY}:18083/" >/dev/null
-          curl -fsS --max-time 20 -H 'Host: workbench.nexbyte.top' "http://${HOST_GATEWAY}/" >/dev/null
+          BUILD_ID=$(git -C "$HOST_WORKSPACE" rev-parse --short HEAD)
+          FRONTEND_HTML=$(curl -fsS --max-time 20 "http://${HOST_GATEWAY}:18083/")
+          printf '%s' "$FRONTEND_HTML" | grep -Fq 'name="workbench-feature" content="accent-themes"'
+          printf '%s' "$FRONTEND_HTML" | grep -Fq "name=\"workbench-build\" content=\"$BUILD_ID\""
+          curl -fsS --max-time 20 -H 'Host: workbench.nexbyte.top' "http://${HOST_GATEWAY}/" | grep -Fq 'name="workbench-feature" content="accent-themes"'
           curl -fsS --max-time 20 -H 'Host: wbapi.nexbyte.top' "http://${HOST_GATEWAY}/health" >/dev/null
         '''
       }

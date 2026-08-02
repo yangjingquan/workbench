@@ -43,8 +43,11 @@ pipeline {
         sh '''
           set -eu
           git clone --depth 1 --single-branch --branch "$BRANCH" https://gh-proxy.com/https://github.com/yangjingquan/workbench.git .
-          git rev-parse --short HEAD
         '''
+        script {
+          env.WORKBENCH_BUILD_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+          echo "Deploying Workbench commit ${env.WORKBENCH_BUILD_ID}"
+        }
       }
     }
     stage('Sync deployment files') {
@@ -109,7 +112,7 @@ pipeline {
         sh '''
           set -eu
           cd "$DEPLOY_DIR"
-          VITE_BUILD_ID=$(git -C "$HOST_WORKSPACE" rev-parse --short HEAD) docker compose --project-name workbench up -d --build workbench-api workbench-web
+          VITE_BUILD_ID="$WORKBENCH_BUILD_ID" docker compose --project-name workbench up -d --build workbench-api workbench-web
           if docker ps -a --format '{{.Names}}' | grep -qx workbench-db; then docker rm -f workbench-db; fi
         '''
       }
@@ -139,7 +142,7 @@ pipeline {
             if [ "$attempt" -eq 30 ]; then exit 1; fi
             sleep 2
           done
-          BUILD_ID=$(git -C "$HOST_WORKSPACE" rev-parse --short HEAD)
+          BUILD_ID="$WORKBENCH_BUILD_ID"
           FRONTEND_HTML=$(curl -fsS --max-time 20 "http://${HOST_GATEWAY}:18083/")
           printf '%s' "$FRONTEND_HTML" | grep -Fq 'name="workbench-feature" content="accent-themes"'
           printf '%s' "$FRONTEND_HTML" | grep -Fq "name=\"workbench-build\" content=\"$BUILD_ID\""

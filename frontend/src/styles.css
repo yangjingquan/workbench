@@ -380,3 +380,96 @@ html.dark { --mobile-topbar-tint: #20263b; }
   .account-entry-form .el-radio-button__inner, .account-summary-header .el-radio-button__inner { width: 100%; }
   .account-summary-header { flex-direction: column; }
 }
+
+/* Mobile dialogs stay centered while tall forms scroll inside the dialog body. */
+@media (max-width: 760px) {
+  .el-overlay-dialog {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    overflow: hidden;
+  }
+  .el-dialog {
+    width: calc(100vw - 32px) !important;
+    max-height: calc(100vh - 32px);
+    margin: 0 !important;
+    display: flex;
+    flex-direction: column;
+  }
+  .el-dialog__header { flex: 0 0 auto; }
+  .el-dialog__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 16px 16px;
+  }
+  .el-dialog__footer { flex: 0 0 auto; }
+
+  .account-category-panel,
+  .account-records-panel { overflow-x: hidden; }
+  .desktop-accounting-table { display: none; }
+  .mobile-accounting-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .mobile-accounting-card {
+    min-width: 0;
+    padding: 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+  }
+  .mobile-accounting-card-header,
+  .mobile-entry-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+  }
+  .mobile-accounting-card-header b,
+  .mobile-accounting-card-header span:first-child,
+  .mobile-entry-category b,
+  .mobile-entry-footer b {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .mobile-accounting-card-stats {
+    display: grid;
+    grid-template-columns: 1fr 72px;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .mobile-accounting-card-stats div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .mobile-accounting-card-stats span,
+  .mobile-entry-category span {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .mobile-accounting-card-stats b { font-size: 16px; }
+  .mobile-entry-category {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+  }
+  .mobile-entry-note {
+    margin: 10px 0 0;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  .mobile-entry-footer { margin-top: 12px; }
+}

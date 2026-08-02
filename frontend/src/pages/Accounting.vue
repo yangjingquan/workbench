@@ -61,17 +61,24 @@
 
   <div class="panel account-category-panel">
     <div class="panel-header"><div><div class="panel-title">分类统计</div><div class="panel-subtitle">当前统计范围内各分类汇总</div></div></div>
-    <el-table :data="summary.by_category" size="small">
+    <div class="desktop-accounting-table"><el-table :data="summary.by_category" size="small">
       <el-table-column prop="category" label="分类" />
       <el-table-column label="类型" width="100"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '进账' : '支出' }}</span></template></el-table-column>
       <el-table-column label="金额" width="150"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">¥ {{ formatMoney(scope.row.total) }}</span></template></el-table-column>
       <el-table-column prop="count" label="笔数" width="100" />
-    </el-table>
+    </el-table></div>
+    <div class="mobile-accounting-list">
+      <article v-for="item in summary.by_category" :key="`${item.category}-${item.entry_type}`" class="mobile-category-card mobile-accounting-card">
+        <div class="mobile-accounting-card-header"><b>{{ item.category }}</b><span :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '进账' : '支出' }}</span></div>
+        <div class="mobile-accounting-card-stats"><div><span>金额</span><b :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">¥ {{ formatMoney(item.total) }}</b></div><div><span>笔数</span><b>{{ item.count }}</b></div></div>
+      </article>
+      <el-empty v-if="!summary.by_category.length" description="当前期间暂无分类统计" />
+    </div>
   </div>
 
   <div class="panel account-records-panel">
     <div class="panel-header"><div><div class="panel-title">账目明细</div><div class="panel-subtitle">{{ summary.start }} 至 {{ summary.end }}</div></div></div>
-    <el-table :data="entries" size="small">
+    <div class="desktop-accounting-table"><el-table :data="entries" size="small">
       <el-table-column prop="entry_date" label="日期" width="130" />
       <el-table-column label="类型" width="100"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '进账' : '支出' }}</span></template></el-table-column>
       <el-table-column prop="category" label="分类" width="150" />
@@ -79,7 +86,16 @@
       <el-table-column label="金额" width="150"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(scope.row.amount) }}</span></template></el-table-column>
       <el-table-column label="操作" width="80"><template #default="scope"><el-button link type="danger" @click="removeEntry(scope.row.id)">删除</el-button></template></el-table-column>
       <template #empty><el-empty description="当前期间暂无账目" /></template>
-    </el-table>
+    </el-table></div>
+    <div class="mobile-accounting-list">
+      <article v-for="item in entries" :key="item.id" class="mobile-entry-card mobile-accounting-card">
+        <div class="mobile-accounting-card-header"><span>{{ item.entry_date }}</span><span :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '进账' : '支出' }}</span></div>
+        <div class="mobile-entry-category"><span>分类</span><b>{{ item.category }}</b></div>
+        <p v-if="item.note" class="mobile-entry-note">{{ item.note }}</p>
+        <div class="mobile-entry-footer"><b :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(item.amount) }}</b><el-button link type="danger" @click="removeEntry(item.id)">删除</el-button></div>
+      </article>
+      <el-empty v-if="!entries.length" description="当前期间暂无账目" />
+    </div>
   </div>
 
   <el-dialog v-model="categoryDialog" title="管理记账分类" width="460px">

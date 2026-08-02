@@ -32,3 +32,11 @@ test('mobile content overrides remove list-page overflow and center controls', (
   assert.match(styles, /\.link-grid\s*\{[^}]*grid-template-columns:\s*1fr/)
   assert.match(styles, /\.el-radio-button__inner\s*\{[^}]*display:\s*inline-flex[^}]*align-items:\s*center[^}]*justify-content:\s*center/)
 })
+
+test('mobile dialogs are centered and accounting tables switch to cards', () => {
+  assert.match(styles, /\.el-overlay-dialog\s*\{[^}]*display:\s*flex[^}]*align-items:\s*center[^}]*justify-content:\s*center/)
+  assert.match(styles, /\.el-dialog\s*\{[^}]*max-height:\s*calc\(100vh - 32px\)/)
+  assert.match(styles, /\.desktop-accounting-table\s*\{[^}]*display:\s*none/)
+  assert.match(styles, /\.mobile-accounting-list\s*\{[^}]*display:\s*flex/)
+  assert.match(styles, /\.account-category-panel,[\s\S]*?\.account-records-panel\s*\{[^}]*overflow-x:\s*hidden/)
+})

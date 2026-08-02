@@ -138,8 +138,13 @@ pipeline {
           FRONTEND_HTML=$(curl -fsS --max-time 20 "http://${HOST_GATEWAY}:18083/")
           printf '%s' "$FRONTEND_HTML" | grep -Fq 'name="workbench-feature" content="accent-themes"'
           printf '%s' "$FRONTEND_HTML" | grep -Fq "name=\"workbench-build\" content=\"$BUILD_ID\""
-          curl -fsS --max-time 20 -H 'Host: workbench.nexbyte.top' "http://${HOST_GATEWAY}/?v=${BUILD_ID}" | grep -Fq "name=\"workbench-build\" content=\"$BUILD_ID\""
-          curl -fsS --max-time 20 -H 'Host: wbapi.nexbyte.top' "http://${HOST_GATEWAY}/health" >/dev/null
+          PROXY_HTML=$(curl -fsS --max-time 20 --resolve "workbench.nexbyte.top:80:${HOST_GATEWAY}" "http://workbench.nexbyte.top/?v=${BUILD_ID}")
+          if ! printf '%s' "$PROXY_HTML" | grep -Fq "name=\"workbench-build\" content=\"$BUILD_ID\""; then
+            echo 'Reverse proxy returned unexpected Workbench HTML:'
+            printf '%s\n' "$PROXY_HTML" | head -c 1000
+            exit 1
+          fi
+          curl -fsS --max-time 20 --resolve "wbapi.nexbyte.top:80:${HOST_GATEWAY}" "http://wbapi.nexbyte.top/health" >/dev/null
         '''
       }
     }

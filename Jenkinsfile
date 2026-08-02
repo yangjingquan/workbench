@@ -150,9 +150,18 @@ pipeline {
             printf '%s\n' "$PROXY_RESPONSE" | head -c 2000
             exit 1
           fi
-          API_RESPONSE=$(curl --noproxy '*' -sS --max-time 20 --resolve "wbapi.nexbyte.top:80:${HOST_GATEWAY}" -w '\n__HTTP_STATUS__=%{http_code}' "http://wbapi.nexbyte.top/health" 2>&1)
-          printf '%s' "$API_RESPONSE" | grep -Fq '__HTTP_STATUS__=200'
-          printf '%s' "$API_RESPONSE" | grep -Fq '"code":0'
+          if API_RESPONSE=$(curl --noproxy '*' -sS --max-time 20 --resolve "wbapi.nexbyte.top:80:${HOST_GATEWAY}" -w '\n__HTTP_STATUS__=%{http_code}' "http://wbapi.nexbyte.top/health" 2>&1); then
+            :
+          else
+            echo 'API reverse proxy request failed:'
+            printf '%s\n' "$API_RESPONSE" | head -c 2000
+            exit 1
+          fi
+          if ! printf '%s' "$API_RESPONSE" | grep -Fq '__HTTP_STATUS__=200' || ! printf '%s' "$API_RESPONSE" | grep -Fq '"code":0'; then
+            echo 'API reverse proxy returned unexpected response:'
+            printf '%s\n' "$API_RESPONSE" | head -c 2000
+            exit 1
+          fi
         '''
       }
     }

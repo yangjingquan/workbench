@@ -138,13 +138,21 @@ pipeline {
           FRONTEND_HTML=$(curl -fsS --max-time 20 "http://${HOST_GATEWAY}:18083/")
           printf '%s' "$FRONTEND_HTML" | grep -Fq 'name="workbench-feature" content="accent-themes"'
           printf '%s' "$FRONTEND_HTML" | grep -Fq "name=\"workbench-build\" content=\"$BUILD_ID\""
-          PROXY_HTML=$(curl -fsS --max-time 20 --resolve "workbench.nexbyte.top:80:${HOST_GATEWAY}" "http://workbench.nexbyte.top/?v=${BUILD_ID}")
-          if ! printf '%s' "$PROXY_HTML" | grep -Fq "name=\"workbench-build\" content=\"$BUILD_ID\""; then
-            echo 'Reverse proxy returned unexpected Workbench HTML:'
-            printf '%s\n' "$PROXY_HTML" | head -c 1000
+          if PROXY_RESPONSE=$(curl --noproxy '*' -sS --max-time 20 --resolve "workbench.nexbyte.top:80:${HOST_GATEWAY}" -w '\n__HTTP_STATUS__=%{http_code}' "http://workbench.nexbyte.top/?v=${BUILD_ID}" 2>&1); then
+            :
+          else
+            echo 'Reverse proxy request failed:'
+            printf '%s\n' "$PROXY_RESPONSE" | head -c 2000
             exit 1
           fi
-          curl -fsS --max-time 20 --resolve "wbapi.nexbyte.top:80:${HOST_GATEWAY}" "http://wbapi.nexbyte.top/health" >/dev/null
+          if ! printf '%s' "$PROXY_RESPONSE" | grep -Fq '__HTTP_STATUS__=200' || ! printf '%s' "$PROXY_RESPONSE" | grep -Fq "name=\"workbench-build\" content=\"$BUILD_ID\""; then
+            echo 'Reverse proxy returned unexpected Workbench response:'
+            printf '%s\n' "$PROXY_RESPONSE" | head -c 2000
+            exit 1
+          fi
+          API_RESPONSE=$(curl --noproxy '*' -sS --max-time 20 --resolve "wbapi.nexbyte.top:80:${HOST_GATEWAY}" -w '\n__HTTP_STATUS__=%{http_code}' "http://wbapi.nexbyte.top/health" 2>&1)
+          printf '%s' "$API_RESPONSE" | grep -Fq '__HTTP_STATUS__=200'
+          printf '%s' "$API_RESPONSE" | grep -Fq '"code":0'
         '''
       }
     }

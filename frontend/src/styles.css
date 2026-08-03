@@ -396,6 +396,7 @@ html.dark { --mobile-topbar-tint: #20263b; }
   .el-date-editor .el-input__inner,
   .el-time-editor .el-input__inner,
   .el-input-number .el-input__inner { font-size: 16px !important; }
+
 }
 
 /* Mobile dialogs stay centered while tall forms scroll inside the dialog body. */
@@ -427,6 +428,15 @@ html.dark { --mobile-topbar-tint: #20263b; }
     padding: 0 16px 16px;
   }
   .el-dialog__footer { flex: 0 0 auto; }
+
+  body .reminder-picker-popper {
+    width: min(324px, calc(100vw - 32px)) !important;
+    max-width: calc(100vw - 32px) !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+  }
+  body .reminder-picker-popper .el-picker-panel { width: 100% !important; }
+  body .reminder-picker-popper .el-popper__arrow { left: 50% !important; }
 
   .account-category-panel,
   .account-records-panel { overflow-x: hidden; }

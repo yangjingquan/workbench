@@ -30,8 +30,8 @@
       <el-form-item label="提醒事项"><el-input v-model="form.title" placeholder="例如：每日复盘、周会、月度账单" /></el-form-item>
       <el-form-item label="备注"><el-input v-model="form.content" placeholder="可选" /></el-form-item>
       <el-form-item label="执行周期"><el-radio-group v-model="form.schedule_type"><el-radio-button label="once">固定日期</el-radio-button><el-radio-button label="daily">每天</el-radio-button><el-radio-button label="weekly">每周</el-radio-button><el-radio-button label="monthly">每月</el-radio-button></el-radio-group></el-form-item>
-      <el-form-item v-if="form.schedule_type === 'once'" label="执行时间"><el-date-picker v-model="form.remind_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" /></el-form-item>
-      <el-form-item v-else label="执行时间"><el-time-picker v-model="form.time_of_day" value-format="HH:mm:ss" format="HH:mm" style="width:100%" /></el-form-item>
+      <el-form-item v-if="form.schedule_type === 'once'" label="执行时间"><el-date-picker v-model="form.remind_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" popper-class="reminder-picker-popper" style="width:100%" /></el-form-item>
+      <el-form-item v-else label="执行时间"><el-time-picker v-model="form.time_of_day" value-format="HH:mm:ss" format="HH:mm" popper-class="reminder-picker-popper" style="width:100%" /></el-form-item>
       <el-form-item v-if="form.schedule_type === 'daily' || form.schedule_type === 'weekly'" :label="form.schedule_type === 'daily' ? '指定星期' : '每周日期'"><el-checkbox-group v-model="form.weekdays" class="weekday-options"><el-checkbox v-for="day in weekdayOptions" :key="day.value" :label="day.value" border>{{ day.label }}</el-checkbox></el-checkbox-group><div v-if="form.schedule_type === 'daily'" class="muted-text">不选择表示每天；选择后仅在指定星期提醒。</div></el-form-item>
       <el-form-item v-if="form.schedule_type === 'monthly'" label="每月日期"><el-select v-model="form.month_days" multiple filterable collapse-tags placeholder="选择日期，可多选" style="width:100%"><el-option v-for="day in 31" :key="day" :label="`${day} 日`" :value="day" /></el-select></el-form-item>
       <div class="muted-text schedule-help">示例：每天 00:05；每周选择周三、周五并设为 13:00；每月选择 1、3 日并设为 14:09。</div>

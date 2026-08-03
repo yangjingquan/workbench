@@ -44,3 +44,8 @@ test('reminder times carry a browser timezone and render UTC instants locally', 
   assert.match(reminderTime, /toISOString\(\)/)
   assert.match(reminderTime, /resolvedOptions\(\)\.timeZone/)
 })
+
+test('mobile reminder dialog wraps schedule controls and centers picker poppers', () => {
+  assert.match(pages.reminders, /popper-class="reminder-picker-popper"/)
+  assert.match(readFileSync(new URL('../styles.css', import.meta.url), 'utf8'), /\.reminder-picker-popper[\s\S]*left: 50% !important/)
+})

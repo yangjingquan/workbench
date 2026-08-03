@@ -5,11 +5,12 @@ import test from 'node:test'
 const pages = {
   records: readFileSync(new URL('../pages/Records.vue', import.meta.url), 'utf8'),
   plans: readFileSync(new URL('../pages/Plans.vue', import.meta.url), 'utf8'),
-  reminders: readFileSync(new URL('../pages/Reminders.vue', import.meta.url), 'utf8')
+  reminders: readFileSync(new URL('../pages/Reminders.vue', import.meta.url), 'utf8'),
+  todos: readFileSync(new URL('../pages/Todos.vue', import.meta.url), 'utf8')
 }
 
 test('mobile list pages expose desktop and mobile presentation hooks', () => {
-  for (const source of Object.values(pages)) {
+  for (const source of Object.values({ records: pages.records, plans: pages.plans, reminders: pages.reminders })) {
     assert.match(source, /class="desktop-table[^\"]*"/)
     assert.match(source, /class="mobile-card-list"/)
   }
@@ -24,4 +25,12 @@ test('mobile cards preserve each page primary fields and actions', () => {
   assert.match(pages.plans, /remove\(row\.id\)/)
   assert.match(pages.reminders, /mobile-reminder-card/)
   assert.match(pages.reminders, /action\(row\.id, 'delete'\)/)
+})
+
+test('Todo mobile interactions support touch movement and archive recovery', () => {
+  assert.match(pages.todos, /class="todo-drag-handle"[^>]*@pointerdown="startPointerDrag\(task, \$event\)"/)
+  assert.match(pages.todos, /@pointerup="finishPointerDrag"/)
+  assert.match(pages.todos, /todo-mobile-move/)
+  assert.match(pages.todos, /archiveOrRestore\(task\)/)
+  assert.match(pages.todos, /restoreTodo/)
 })

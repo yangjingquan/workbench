@@ -389,6 +389,26 @@ def todo_dict(row: TodoTask):
     return result
 
 
+def _ensure_todo_completion_record(task: TodoTask, user_id: int, db: Session) -> None:
+    """Create one linked work record the first time a Todo reaches done."""
+    if not task.id:
+        return
+    existing = db.scalar(select(WorkRecord).where(WorkRecord.user_id == user_id, WorkRecord.task_id == task.id))
+    if existing:
+        return
+    content_parts = [value.strip() for value in (task.description, task.notes) if value and value.strip()]
+    completed_at = task.completed_at or datetime.now()
+    db.add(WorkRecord(
+        user_id=user_id,
+        title=task.title[:200],
+        content="\n\n".join(content_parts),
+        work_date=completed_at.date(),
+        hours=round((task.elapsed_seconds or 0) / 3600, 2),
+        tags=list(task.tags or []),
+        task_id=task.id,
+    ))
+
+
 @router.get("/todos")
 def list_todos(include_archived: bool = False, keyword: str | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     query = select(TodoTask).where(TodoTask.user_id == user.id)
@@ -399,7 +419,12 @@ def list_todos(include_archived: bool = False, keyword: str | None = None, db: S
 
 @router.post("/todos")
 def create_todo(payload: TodoIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    row = TodoTask(user_id=user.id, **payload.model_dump()); db.add(row); db.commit(); db.refresh(row); return ok(todo_dict(row), "待办已创建")
+    row = TodoTask(user_id=user.id, **payload.model_dump()); db.add(row)
+    if row.status == "done":
+        row.completed_at = datetime.now()
+        db.flush()
+        _ensure_todo_completion_record(row, user.id, db)
+    db.commit(); db.refresh(row); return ok(todo_dict(row), "待办已创建")
 
 
 @router.post("/todos/batch")
@@ -407,7 +432,8 @@ def batch_todos(action: str = Query(..., pattern="^(complete|delete|archive)$"),
     rows = db.scalars(select(TodoTask).where(TodoTask.user_id == user.id, TodoTask.id.in_(ids))).all()
     for row in rows:
         if action == "delete": db.delete(row)
-        elif action == "complete": row.status = "done"; row.completed_at = datetime.now()
+        elif action == "complete":
+            row.status = "done"; row.completed_at = row.completed_at or datetime.now(); _ensure_todo_completion_record(row, user.id, db)
         else: row.archived = True
     db.commit(); return ok(msg="批量操作完成")
 
@@ -417,7 +443,11 @@ def update_todo(item_id: int, payload: TodoIn, db: Session = Depends(get_db), us
     row = db.scalar(select(TodoTask).where(TodoTask.id == item_id, TodoTask.user_id == user.id))
     if not row: raise HTTPException(404, "待办不存在")
     for key, value in payload.model_dump().items(): setattr(row, key, value)
-    if row.status == "done": row.completed_at = datetime.now()
+    if row.status == "done":
+        row.completed_at = row.completed_at or datetime.now()
+        _ensure_todo_completion_record(row, user.id, db)
+    elif row.status != "done":
+        row.completed_at = None
     db.commit(); db.refresh(row); return ok(todo_dict(row), "待办已更新")
 
 
@@ -426,6 +456,7 @@ def update_todo_status(item_id: int, payload: TodoStatusIn, db: Session = Depend
     row = db.scalar(select(TodoTask).where(TodoTask.id == item_id, TodoTask.user_id == user.id))
     if not row: raise HTTPException(404, "待办不存在")
     row.status = payload.status; row.completed_at = datetime.now() if payload.status == "done" else None
+    if payload.status == "done": _ensure_todo_completion_record(row, user.id, db)
     db.commit(); return ok(todo_dict(row), "状态已更新")
 
 
@@ -465,6 +496,13 @@ def archive_todo(item_id: int, db: Session = Depends(get_db), user: User = Depen
     row = db.scalar(select(TodoTask).where(TodoTask.id == item_id, TodoTask.user_id == user.id));
     if not row: raise HTTPException(404, "待办不存在")
     row.archived = True; db.commit(); return ok(msg="已归档")
+
+
+@router.patch("/todos/{item_id}/restore")
+def restore_todo(item_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    row = db.scalar(select(TodoTask).where(TodoTask.id == item_id, TodoTask.user_id == user.id))
+    if not row: raise HTTPException(404, "待办不存在")
+    row.archived = False; db.commit(); return ok(todo_dict(row), "已恢复到看板")
 
 
 @router.get("/quick-links")

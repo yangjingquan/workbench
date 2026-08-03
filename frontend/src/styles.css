@@ -338,7 +338,12 @@ button:focus-visible, a:focus-visible { outline-color: var(--primary); }
 :root { --mobile-topbar-tint: #f0f2ff; }
 html.dark { --mobile-topbar-tint: #20263b; }
 
-.mobile-card-list { display: none; }
+.mobile-card-list, .mobile-accounting-list, .todo-mobile-move { display: none; }
+.todo-archive-help { color: var(--primary); font-size: 12px; cursor: help; }
+.todo-card-top { display: flex; align-items: flex-start; gap: 8px; }
+.todo-title { flex: 1; min-width: 0; }
+.todo-drag-handle { display: none; color: var(--muted); background: transparent; font-size: 18px; line-height: 1; padding: 0 2px; }
+.todo-card.is-dragging { opacity: .58; transform: scale(.99); }
 
 @media (max-width: 760px) {
   body, .content-scroll { overflow-x: hidden; }
@@ -379,6 +384,18 @@ html.dark { --mobile-topbar-tint: #20263b; }
   .account-entry-form .el-radio-button, .account-summary-header .el-radio-button { flex: 1 1 0; }
   .account-entry-form .el-radio-button__inner, .account-summary-header .el-radio-button__inner { width: 100%; }
   .account-summary-header { flex-direction: column; }
+  .todo-toolbar-help { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .todo-card { touch-action: pan-y; user-select: none; }
+  .todo-drag-handle { display: grid; place-items: center; min-width: 32px; min-height: 32px; touch-action: none; cursor: grab; border-radius: 8px; }
+  .todo-drag-handle:active { cursor: grabbing; background: var(--primary-soft); color: var(--primary); }
+  .todo-mobile-move { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0 0 22px; color: var(--muted); font-size: 12px; }
+  .todo-mobile-move .el-select { flex: 1; min-width: 0; }
+  .el-input__inner,
+  .el-textarea__inner,
+  .el-select__input,
+  .el-date-editor .el-input__inner,
+  .el-time-editor .el-input__inner,
+  .el-input-number .el-input__inner { font-size: 16px !important; }
 }
 
 /* Mobile dialogs stay centered while tall forms scroll inside the dialog body. */
@@ -389,10 +406,12 @@ html.dark { --mobile-topbar-tint: #20263b; }
     justify-content: center;
     padding: 16px;
     overflow: hidden;
+    min-height: 100dvh;
   }
   .el-dialog {
     width: calc(100vw - 32px) !important;
     max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
     margin: 0 !important;
     display: flex;
     flex-direction: column;
@@ -402,6 +421,7 @@ html.dark { --mobile-topbar-tint: #20263b; }
     flex: 1 1 auto;
     min-height: 0;
     max-height: calc(100vh - 150px);
+    max-height: calc(100dvh - 150px);
     overflow-y: auto;
     overflow-x: hidden;
     padding: 0 16px 16px;

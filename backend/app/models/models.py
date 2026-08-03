@@ -62,6 +62,7 @@ class EventReminder(TimestampMixin, Base):
     month_days: Mapped[list | None] = mapped_column(JSON, nullable=True)
     next_trigger_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     last_trigger_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    timezone: Mapped[str] = mapped_column(String(64), default="Asia/Shanghai")
 
 
 class TodoTask(TimestampMixin, Base):

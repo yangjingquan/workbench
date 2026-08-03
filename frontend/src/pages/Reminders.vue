@@ -8,7 +8,7 @@
     <el-table :data="rows" stripe>
       <el-table-column prop="title" label="提醒事项" min-width="190" />
       <el-table-column label="规则" min-width="280"><template #default="scope"><b>{{ scheduleText(scope.row) }}</b><div v-if="scope.row.content" class="muted-text"><a v-if="isUrl(scope.row.content)" class="reminder-link" :href="normalizeUrl(scope.row.content)" target="_blank" rel="noopener noreferrer" @click.stop>{{ scope.row.content }}</a><span v-else>{{ scope.row.content }}</span></div><div v-else class="muted-text">无备注</div></template></el-table-column>
-      <el-table-column label="下一次执行" width="185"><template #default="scope">{{ scope.row.status === 'active' ? (scope.row.next_trigger_at || '已完成') : '—' }}</template></el-table-column>
+      <el-table-column label="下一次执行" width="185"><template #default="scope">{{ scope.row.status === 'active' ? (formatLocalDateTime(scope.row.next_trigger_at) || '已完成') : '—' }}</template></el-table-column>
       <el-table-column label="状态" width="100"><template #default="scope"><span :class="['status-tag', scope.row.status === 'closed' ? 'muted-status' : '']">{{ statusLabel(scope.row) }}</span></template></el-table-column>
       <el-table-column label="操作" width="245" fixed="right"><template #default="scope"><el-button link type="primary" @click="openEdit(scope.row)">编辑</el-button><el-button v-if="scope.row.status === 'active'" link type="warning" @click="action(scope.row.id, 'close')">关闭</el-button><el-button v-else link type="success" @click="action(scope.row.id, 'activate')">启用</el-button><el-button link type="danger" @click="action(scope.row.id, 'delete')">删除</el-button></template></el-table-column>
     </el-table>
@@ -44,22 +44,23 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../api/http'
+import { browserTimezone, formatLocalDateTime, toUtcIso } from '../utils/reminderTime'
 
 const rows = ref([])
 const dialog = ref(false)
 const editing = ref(null)
 const weekdayOptions = [{ value: 1, label: '周一' }, { value: 2, label: '周二' }, { value: 3, label: '周三' }, { value: 4, label: '周四' }, { value: 5, label: '周五' }, { value: 6, label: '周六' }, { value: 7, label: '周日' }]
-const form = reactive({ title: '', content: '', schedule_type: 'once', remind_at: '', time_of_day: '00:05:00', weekdays: [], month_days: [] })
+const form = reactive({ title: '', content: '', schedule_type: 'once', remind_at: '', time_of_day: '00:05:00', weekdays: [], month_days: [], timezone: browserTimezone() })
 
 async function load() { rows.value = (await api.reminders()).data }
-function resetForm() { Object.assign(form, { title: '', content: '', schedule_type: 'once', remind_at: '', time_of_day: '00:05:00', weekdays: [], month_days: [] }) }
+function resetForm() { Object.assign(form, { title: '', content: '', schedule_type: 'once', remind_at: '', time_of_day: '00:05:00', weekdays: [], month_days: [], timezone: browserTimezone() }) }
 function openCreate() { editing.value = null; resetForm(); dialog.value = true }
-function openEdit(row) { editing.value = row.id; Object.assign(form, { title: row.title, content: row.content || '', schedule_type: row.schedule_type || 'once', remind_at: row.schedule_type === 'once' ? row.remind_at?.replace('T', ' ') : '', time_of_day: row.time_of_day || '00:05:00', weekdays: row.weekdays || [], month_days: row.month_days || [] }); dialog.value = true }
+function openEdit(row) { editing.value = row.id; Object.assign(form, { title: row.title, content: row.content || '', schedule_type: row.schedule_type || 'once', remind_at: row.schedule_type === 'once' ? formatLocalDateTime(row.remind_at) : '', time_of_day: row.time_of_day || '00:05:00', weekdays: row.weekdays || [], month_days: row.month_days || [], timezone: row.timezone || browserTimezone() }); dialog.value = true }
 function statusLabel(row) { if (row.status === 'active') return '生效中'; if (row.schedule_type === 'once') return '已失效'; return '已关闭' }
-function scheduleText(row) { const time = (row.time_of_day || '').slice(0, 5); if (row.schedule_type === 'daily') return row.weekdays?.length ? `每周 ${(row.weekdays || []).map(x => weekdayOptions.find(day => day.value === x)?.label).join('、')} ${time}` : `每天 ${time}`; if (row.schedule_type === 'weekly') return `每周 ${(row.weekdays || []).map(x => weekdayOptions.find(day => day.value === x)?.label).join('、')} ${time}`; if (row.schedule_type === 'monthly') return `每月 ${(row.month_days || []).join('、')} 日 ${time}`; return `固定 ${row.remind_at?.replace('T', ' ') || '未设置'}` }
+function scheduleText(row) { const time = (row.time_of_day || '').slice(0, 5); if (row.schedule_type === 'daily') return row.weekdays?.length ? `每周 ${(row.weekdays || []).map(x => weekdayOptions.find(day => day.value === x)?.label).join('、')} ${time}` : `每天 ${time}`; if (row.schedule_type === 'weekly') return `每周 ${(row.weekdays || []).map(x => weekdayOptions.find(day => day.value === x)?.label).join('、')} ${time}`; if (row.schedule_type === 'monthly') return `每月 ${(row.month_days || []).join('、')} 日 ${time}`; return `固定 ${formatLocalDateTime(row.remind_at) || '未设置'}` }
 function isUrl(value) { return /^(https?:\/\/|www\.)[^\s]+$/i.test(value.trim()) }
 function normalizeUrl(value) { const url = value.trim(); return /^https?:\/\//i.test(url) ? url : `https://${url}` }
-async function save() { if (!form.title) return ElMessage.warning('请填写提醒事项'); if (form.schedule_type === 'once' && !form.remind_at) return ElMessage.warning('请选择固定执行时间'); if (form.schedule_type === 'weekly' && !form.weekdays.length) return ElMessage.warning('至少选择一个星期'); if (form.schedule_type === 'monthly' && !form.month_days.length) return ElMessage.warning('至少选择一个月内日期'); const payload = { ...form, remind_at: form.schedule_type === 'once' ? form.remind_at : null }; if (editing.value) await api.updateReminder(editing.value, payload); else await api.reminder(payload); dialog.value = false; ElMessage.success('提醒已保存'); await load() }
+async function save() { if (!form.title) return ElMessage.warning('请填写提醒事项'); if (form.schedule_type === 'once' && !form.remind_at) return ElMessage.warning('请选择固定执行时间'); if (form.schedule_type === 'weekly' && !form.weekdays.length) return ElMessage.warning('至少选择一个星期'); if (form.schedule_type === 'monthly' && !form.month_days.length) return ElMessage.warning('至少选择一个月内日期'); const payload = { ...form, remind_at: form.schedule_type === 'once' ? toUtcIso(form.remind_at) : null, timezone: form.timezone || browserTimezone() }; if (editing.value) await api.updateReminder(editing.value, payload); else await api.reminder(payload); dialog.value = false; ElMessage.success('提醒已保存'); await load() }
 async function action(id, type) { await api.reminderAction(id, type); ElMessage.success(type === 'delete' ? '提醒已删除' : type === 'activate' ? '提醒已启用' : '提醒状态已更新'); await load() }
 async function enableNotifications() { if (!('Notification' in window)) return ElMessage.warning('当前浏览器不支持桌面通知'); const permission = await Notification.requestPermission(); ElMessage[permission === 'granted' ? 'success' : 'warning'](permission === 'granted' ? '桌面通知已开启' : '浏览器未允许桌面通知；页面内提醒仍会正常显示') }
 onMounted(load)

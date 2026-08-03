@@ -1,3 +1,6 @@
+from datetime import datetime, timezone as dt_timezone
+from zoneinfo import ZoneInfo
+
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -30,7 +33,9 @@ def ensure_schema():
         "month_days": "JSON NULL",
         "next_trigger_at": "DATETIME NULL",
         "last_trigger_at": "DATETIME NULL",
+        "timezone": "VARCHAR(64) NOT NULL DEFAULT 'Asia/Shanghai'",
     }
+    timezone_added = "timezone" not in columns
     with engine.begin() as conn:
         for name, ddl in additions.items():
             if name not in columns:
@@ -40,3 +45,32 @@ def ensure_schema():
         conn.execute(text("UPDATE event_reminder SET weekdays = JSON_ARRAY(MOD(DAYOFWEEK(remind_at) + 5, 7) + 1) WHERE schedule_type = 'weekly' AND weekdays IS NULL"))
         conn.execute(text("UPDATE event_reminder SET month_days = JSON_ARRAY(DAY(remind_at)) WHERE schedule_type = 'monthly' AND month_days IS NULL"))
         conn.execute(text("UPDATE event_reminder SET next_trigger_at = remind_at WHERE next_trigger_at IS NULL AND status = 'active'"))
+        if timezone_added:
+            legacy_zone = ZoneInfo("Asia/Shanghai")
+            rows = conn.execute(text("SELECT id, remind_at, snoozed_until, next_trigger_at, last_trigger_at FROM event_reminder")).mappings().all()
+
+            def legacy_to_utc(value: datetime | None) -> datetime | None:
+                if value is None:
+                    return None
+                return value.replace(tzinfo=legacy_zone).astimezone(dt_timezone.utc).replace(tzinfo=None)
+
+            for row in rows:
+                conn.execute(
+                    text("""
+                        UPDATE event_reminder
+                        SET timezone = :timezone,
+                            remind_at = :remind_at,
+                            snoozed_until = :snoozed_until,
+                            next_trigger_at = :next_trigger_at,
+                            last_trigger_at = :last_trigger_at
+                        WHERE id = :id
+                    """),
+                    {
+                        "id": row["id"],
+                        "timezone": "Asia/Shanghai",
+                        "remind_at": legacy_to_utc(row["remind_at"]),
+                        "snoozed_until": legacy_to_utc(row["snoozed_until"]),
+                        "next_trigger_at": legacy_to_utc(row["next_trigger_at"]),
+                        "last_trigger_at": legacy_to_utc(row["last_trigger_at"]),
+                    },
+                )

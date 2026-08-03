@@ -9,6 +9,8 @@ const pages = {
   todos: readFileSync(new URL('../pages/Todos.vue', import.meta.url), 'utf8')
 }
 
+const reminderTime = readFileSync(new URL('../utils/reminderTime.js', import.meta.url), 'utf8')
+
 test('mobile list pages expose desktop and mobile presentation hooks', () => {
   for (const source of Object.values({ records: pages.records, plans: pages.plans, reminders: pages.reminders })) {
     assert.match(source, /class="desktop-table[^\"]*"/)
@@ -33,4 +35,12 @@ test('Todo mobile interactions support touch movement and archive recovery', () 
   assert.match(pages.todos, /todo-mobile-move/)
   assert.match(pages.todos, /archiveOrRestore\(task\)/)
   assert.match(pages.todos, /restoreTodo/)
+})
+
+test('reminder times carry a browser timezone and render UTC instants locally', () => {
+  assert.match(pages.reminders, /timezone: browserTimezone\(\)/)
+  assert.match(pages.reminders, /remind_at: form\.schedule_type === 'once' \? toUtcIso\(form\.remind_at\) : null/)
+  assert.match(pages.reminders, /formatLocalDateTime\(row\.remind_at\)/)
+  assert.match(reminderTime, /toISOString\(\)/)
+  assert.match(reminderTime, /resolvedOptions\(\)\.timeZone/)
 })

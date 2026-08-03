@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from calendar import monthrange
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -16,6 +17,41 @@ from app.db.session import get_db
 from app.models import AccountCategory, AccountEntry, EventReminder, Memo, QuickLink, SystemConfig, TodoSubtask, TodoTask, ToolUsageLog, User, WorkPlan, WorkRecord
 
 router = APIRouter(prefix="/api")
+DEFAULT_TIMEZONE = "Asia/Shanghai"
+UTC = dt_timezone.utc
+
+
+def _zone(name: str | None) -> ZoneInfo:
+    timezone_name = name or DEFAULT_TIMEZONE
+    try:
+        return ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        raise HTTPException(400, f"无效的时区：{timezone_name}")
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _to_utc_naive(value: datetime | None, zone: ZoneInfo) -> datetime | None:
+    if value is None:
+        return None
+    aware = value if value.tzinfo else value.replace(tzinfo=zone)
+    return aware.astimezone(UTC).replace(tzinfo=None)
+
+
+def _from_utc_naive(value: datetime | None, zone: ZoneInfo) -> datetime | None:
+    if value is None:
+        return None
+    aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value
+    return aware.astimezone(zone).replace(tzinfo=None)
+
+
+def _utc_iso(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value
+    return aware.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _time_value(value: str | None) -> tuple[int, int, int]:
@@ -73,14 +109,19 @@ def _next_occurrence(schedule_type: str, value: str | None, weekdays: list[int],
 
 
 def _prepare_reminder(payload: ReminderIn, now: datetime) -> dict:
+    zone = _zone(payload.timezone)
+    now_utc = now.astimezone(UTC).replace(tzinfo=None) if now.tzinfo else now
+    now_local = _from_utc_naive(now_utc, zone)
     schedule_type = payload.schedule_type
     if schedule_type not in {"once", "daily", "weekly", "monthly"}:
         raise HTTPException(400, "不支持的提醒周期")
     if schedule_type == "once":
         if not payload.remind_at:
             raise HTTPException(400, "固定日期提醒必须填写执行时间")
-        next_trigger = payload.remind_at
-        time_of_day = payload.remind_at.strftime("%H:%M:%S")
+        remind_at = _to_utc_naive(payload.remind_at, zone)
+        local_remind_at = _from_utc_naive(remind_at, zone)
+        next_trigger = remind_at
+        time_of_day = local_remind_at.strftime("%H:%M:%S")
     else:
         time_of_day = payload.time_of_day or (payload.remind_at.strftime("%H:%M:%S") if payload.remind_at else None)
         _time_value(time_of_day)
@@ -88,9 +129,10 @@ def _prepare_reminder(payload: ReminderIn, now: datetime) -> dict:
             raise HTTPException(400, "每周提醒至少选择一天")
         if schedule_type == "monthly" and not payload.month_days:
             raise HTTPException(400, "每月提醒至少选择一个日期")
-        next_trigger = _next_occurrence(schedule_type, time_of_day, payload.weekdays, payload.month_days, now)
+        next_local = _next_occurrence(schedule_type, time_of_day, payload.weekdays, payload.month_days, now_local)
+        next_trigger = _to_utc_naive(next_local, zone)
     return {
-        "remind_at": payload.remind_at or next_trigger or now,
+        "remind_at": next_trigger or now_utc,
         "repeat_type": schedule_type,
         "schedule_type": schedule_type,
         "time_of_day": time_of_day,
@@ -98,14 +140,18 @@ def _prepare_reminder(payload: ReminderIn, now: datetime) -> dict:
         "month_days": sorted(set(payload.month_days)),
         "next_trigger_at": next_trigger,
         "snoozed_until": None,
+        "timezone": payload.timezone or DEFAULT_TIMEZONE,
     }
 
 
 def _reminder_dict(row: EventReminder) -> dict:
     result = dump(row)
+    for key in ("remind_at", "snoozed_until", "next_trigger_at", "last_trigger_at"):
+        result[key] = _utc_iso(result.get(key))
     result["schedule_type"] = row.schedule_type or row.repeat_type or "once"
     result["weekdays"] = row.weekdays or []
     result["month_days"] = row.month_days or []
+    result["timezone"] = row.timezone or DEFAULT_TIMEZONE
     return result
 
 
@@ -154,6 +200,7 @@ class ReminderIn(BaseModel):
     time_of_day: str | None = None
     weekdays: list[int] = []
     month_days: list[int] = []
+    timezone: str = DEFAULT_TIMEZONE
 
 
 class TodoIn(BaseModel):
@@ -334,7 +381,7 @@ def delete_plan(item_id: int, db: Session = Depends(get_db), user: User = Depend
 def list_reminders(due: bool = False, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     query = select(EventReminder).where(EventReminder.user_id == user.id, EventReminder.status != "deleted")
     if due:
-        now = datetime.now()
+        now = _utc_now()
         query = query.where(
             EventReminder.status == "active",
             EventReminder.next_trigger_at.is_not(None),
@@ -347,7 +394,7 @@ def list_reminders(due: bool = False, db: Session = Depends(get_db), user: User 
 
 @router.post("/reminders")
 def create_reminder(payload: ReminderIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    prepared = _prepare_reminder(payload, datetime.now())
+    prepared = _prepare_reminder(payload, _utc_now())
     row = EventReminder(user_id=user.id, title=payload.title, content=payload.content, **prepared)
     db.add(row); db.commit(); db.refresh(row); return ok(_reminder_dict(row), "提醒已创建")
 
@@ -356,7 +403,7 @@ def create_reminder(payload: ReminderIn, db: Session = Depends(get_db), user: Us
 def update_reminder(item_id: int, payload: ReminderIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     row = db.scalar(select(EventReminder).where(EventReminder.id == item_id, EventReminder.user_id == user.id, EventReminder.status != "deleted"))
     if not row: raise HTTPException(404, "提醒不存在")
-    prepared = _prepare_reminder(payload, datetime.now())
+    prepared = _prepare_reminder(payload, _utc_now())
     row.title = payload.title; row.content = payload.content; row.status = "active"
     for key, value in prepared.items(): setattr(row, key, value)
     db.commit(); db.refresh(row); return ok(_reminder_dict(row), "提醒已更新")
@@ -366,19 +413,24 @@ def update_reminder(item_id: int, payload: ReminderIn, db: Session = Depends(get
 def reminder_action(item_id: int, action: str = Query(..., pattern="^(ack|snooze|close|activate|delete)$"), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     row = db.scalar(select(EventReminder).where(EventReminder.id == item_id, EventReminder.user_id == user.id, EventReminder.status != "deleted"))
     if not row: raise HTTPException(404, "提醒不存在")
-    now = datetime.now()
+    now = _utc_now()
+    zone = _zone(row.timezone)
     if action == "ack":
         current_trigger = row.next_trigger_at or now
         row.last_trigger_at = current_trigger
         row.snoozed_until = None
         if row.schedule_type == "once": row.next_trigger_at = None; row.status = "closed"
-        else: row.next_trigger_at = _next_occurrence(row.schedule_type, row.time_of_day, row.weekdays or [], row.month_days or [], current_trigger)
+        else:
+            current_local = _from_utc_naive(current_trigger, zone)
+            row.next_trigger_at = _to_utc_naive(_next_occurrence(row.schedule_type, row.time_of_day, row.weekdays or [], row.month_days or [], current_local), zone)
     elif action == "snooze": row.snoozed_until = now + timedelta(minutes=10)
     elif action == "close": row.status = "closed"; row.snoozed_until = None
     elif action == "activate":
         row.status = "active"; row.snoozed_until = None
         if row.schedule_type == "once": row.next_trigger_at = row.remind_at if row.remind_at and row.remind_at > now else None
-        else: row.next_trigger_at = _next_occurrence(row.schedule_type, row.time_of_day, row.weekdays or [], row.month_days or [], now)
+        else:
+            now_local = _from_utc_naive(now, zone)
+            row.next_trigger_at = _to_utc_naive(_next_occurrence(row.schedule_type, row.time_of_day, row.weekdays or [], row.month_days or [], now_local), zone)
     elif action == "delete": row.status = "deleted"; row.snoozed_until = None; row.next_trigger_at = None
     db.commit(); return ok(_reminder_dict(row), "提醒已处理")
 

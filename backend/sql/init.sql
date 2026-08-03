@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS work_plan (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS event_reminder (
   id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, title VARCHAR(200) NOT NULL, content TEXT, remind_at DATETIME NOT NULL, repeat_type VARCHAR(20) NOT NULL DEFAULT 'once', status VARCHAR(20) NOT NULL DEFAULT 'active', snoozed_until DATETIME NULL,
-  schedule_type VARCHAR(20) NOT NULL DEFAULT 'once', time_of_day VARCHAR(8) NULL, weekdays JSON NULL, month_days JSON NULL, next_trigger_at DATETIME NULL, last_trigger_at DATETIME NULL,
+  schedule_type VARCHAR(20) NOT NULL DEFAULT 'once', time_of_day VARCHAR(8) NULL, weekdays JSON NULL, month_days JSON NULL, next_trigger_at DATETIME NULL, last_trigger_at DATETIME NULL, timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Shanghai',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX(user_id), INDEX(remind_at),
   CONSTRAINT fk_reminder_user FOREIGN KEY(user_id) REFERENCES `user`(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

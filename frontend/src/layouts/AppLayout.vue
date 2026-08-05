@@ -22,6 +22,8 @@
         </button>
         <div class="breadcrumb"><span class="eyebrow">PERSONAL OS</span><span class="slash">/</span><span>{{ route.meta.title || '总览看板' }}</span></div>
         <div class="top-actions">
+          <el-select class="workspace-context-select" :model-value="app.currentWorkspaceId" placeholder="工作区" clearable @change="app.selectWorkspace"><el-option v-for="workspace in app.workspaces" :key="workspace.id" :label="workspace.name" :value="workspace.id" /></el-select>
+          <el-select class="project-context-select" :model-value="app.currentProjectId" placeholder="全部项目" clearable @change="app.selectProject"><el-option v-for="project in app.projects.filter(item => !app.currentWorkspaceId || item.workspace_id === app.currentWorkspaceId)" :key="project.id" :label="project.name" :value="project.id" /></el-select>
           <button class="icon-button" title="全局检索" @click="searchOpen = true"><el-icon><Search /></el-icon></button>
           <button class="icon-button" title="切换主题模式" aria-label="切换浅色或暗黑模式" @click="app.toggleTheme()"><el-icon><Moon v-if="app.theme === 'light'" /><Sunny v-else /></el-icon></button>
           <button class="icon-button accent-toggle" :title="app.accentTheme === 'indigo' ? '切换到天蓝青绿' : '切换到蓝紫品牌'" :aria-label="app.accentTheme === 'indigo' ? '切换到天蓝青绿主题' : '切换到蓝紫品牌主题'" @click="app.toggleAccentTheme()"><span :class="['accent-swatch', app.accentTheme]" /></button>
@@ -54,14 +56,14 @@
 </template>
 
 <script setup>
-import { nextTick, reactive, ref, watch } from 'vue'
+import { nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAppStore } from '../stores'
 import { api } from '../api/http'
 import ReminderPoll from '../components/ReminderPoll.vue'
 import { createMobileNavState, toggleMobileNav, closeMobileNav } from './mobileNav'
-import { Odometer, Calendar, Bell, List, Link, Tools, Wallet, Memo, Setting, Search, Moon, Sunny, DArrowLeft, DArrowRight, Menu, Close } from '@element-plus/icons-vue'
+import { Odometer, Calendar, Bell, List, Link, FolderOpened, Tools, Wallet, Memo, Setting, Search, Moon, Sunny, DArrowLeft, DArrowRight, Menu, Close } from '@element-plus/icons-vue'
 const app = useAppStore(); const route = useRoute(); const router = useRouter(); const searchOpen = ref(false); const keyword = ref(''); const results = ref(null)
 const mobileNav = reactive(createMobileNavState())
 const mobileMenuTrigger = ref(null)
@@ -98,9 +100,10 @@ function handleMobileNavKeydown(event) {
   if (!mobileNavPanel.value?.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus() }
 }
 watch(() => route.fullPath, closeMobileMenu)
-const mainNav = [{ path: '/dashboard', label: '总览看板', icon: Odometer }, { path: '/records', label: '工作记录', icon: List }, { path: '/plans', label: '工作计划', icon: Calendar }, { path: '/reminders', label: '事件提醒', icon: Bell }, { path: '/todos', label: 'Todo 看板', icon: List }, { path: '/links', label: '快捷导航', icon: Link }]
+const mainNav = [{ path: '/dashboard', label: '总览看板', icon: Odometer }, { path: '/projects', label: '项目管理', icon: FolderOpened }, { path: '/records', label: '工作记录', icon: List }, { path: '/plans', label: '工作计划', icon: Calendar }, { path: '/reminders', label: '事件提醒', icon: Bell }, { path: '/todos', label: 'Todo 看板', icon: List }, { path: '/links', label: '快捷导航', icon: Link }]
 const groupNames = { records: '工作记录', plans: '计划', todos: '待办', links: '链接', memos: '备忘录' }
 async function doSearch() { if (!keyword.value.trim()) return; results.value = (await api.search(keyword.value)).data }
 function goToSearchResult(type) { const target = { records: '/records', plans: '/plans', todos: '/todos', links: '/links', memos: '/memos' }[type]; if (!target) return; searchOpen.value = false; router.push(target) }
 async function handleUserCommand(command) { if (command === 'profile') return router.push('/profile'); app.clearSession(); await router.replace('/login'); ElMessage.success('已退出登录') }
+onMounted(() => { app.loadProjectContext().catch(() => {}) })
 </script>

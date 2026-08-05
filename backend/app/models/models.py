@@ -22,6 +22,34 @@ class User(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class Workspace(TimestampMixin, Base):
+    __tablename__ = "workspace"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(30), default="personal")
+    color: Mapped[str] = mapped_column(String(20), default="#5b5ce2")
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+
+class Project(TimestampMixin, Base):
+    __tablename__ = "project"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), index=True)
+    workspace_id: Mapped[int] = mapped_column(ForeignKey("workspace.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(160))
+    description: Mapped[str] = mapped_column(Text, default="")
+    goal: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="planning", index=True)
+    tech_stack: Mapped[list] = mapped_column(JSON, default=list)
+    repo_url: Mapped[str] = mapped_column(String(1000), default="")
+    local_path: Mapped[str] = mapped_column(String(1000), default="")
+    deployment_url: Mapped[str] = mapped_column(String(1000), default="")
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+
 class WorkRecord(TimestampMixin, Base):
     __tablename__ = "work_record"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -32,6 +60,7 @@ class WorkRecord(TimestampMixin, Base):
     hours: Mapped[float] = mapped_column(Float, default=0)
     tags: Mapped[list] = mapped_column(JSON, default=list)
     task_id: Mapped[int | None] = mapped_column(ForeignKey("todo_task.id", ondelete="SET NULL"), nullable=True)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("project.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
 class WorkPlan(TimestampMixin, Base):
@@ -44,6 +73,7 @@ class WorkPlan(TimestampMixin, Base):
     end_date: Mapped[date] = mapped_column(Date)
     priority: Mapped[str] = mapped_column(String(20), default="medium")
     status: Mapped[str] = mapped_column(String(20), default="pending")
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("project.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
 class EventReminder(TimestampMixin, Base):
@@ -83,6 +113,7 @@ class TodoTask(TimestampMixin, Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     timer_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     elapsed_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("project.id", ondelete="SET NULL"), nullable=True, index=True)
     subtasks: Mapped[list["TodoSubtask"]] = relationship("TodoSubtask", cascade="all, delete-orphan", lazy="selectin")
 
 
@@ -103,6 +134,7 @@ class QuickLink(TimestampMixin, Base):
     category: Mapped[str] = mapped_column(String(80), default="未分类")
     description: Mapped[str] = mapped_column(String(500), default="")
     position: Mapped[int] = mapped_column(Integer, default=0)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("project.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
 class ToolUsageLog(Base):
@@ -149,3 +181,36 @@ class Memo(TimestampMixin, Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(200))
     content: Mapped[str] = mapped_column(Text)
+    project_id: Mapped[int | None] = mapped_column(ForeignKey("project.id", ondelete="SET NULL"), nullable=True, index=True)
+
+
+class ProjectMilestone(TimestampMixin, Base):
+    __tablename__ = "project_milestone"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class ProjectVersion(TimestampMixin, Base):
+    __tablename__ = "project_version"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), index=True)
+    version: Mapped[str] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(20), default="planned")
+    target_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    release_notes: Mapped[str] = mapped_column(Text, default="")
+
+
+class ProjectCommit(TimestampMixin, Base):
+    __tablename__ = "project_commit"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("project.id", ondelete="CASCADE"), index=True)
+    commit_hash: Mapped[str] = mapped_column(String(120))
+    message: Mapped[str] = mapped_column(String(500))
+    branch: Mapped[str] = mapped_column(String(160), default="main")
+    committed_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    url: Mapped[str] = mapped_column(String(1000), default="")

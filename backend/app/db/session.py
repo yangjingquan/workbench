@@ -25,6 +25,13 @@ def get_db():
 def ensure_schema():
     """创建表并为旧版提醒表补齐周期调度字段。"""
     Base.metadata.create_all(bind=engine)
+    project_tables = {
+        "work_record": "INT NULL",
+        "work_plan": "INT NULL",
+        "todo_task": "INT NULL",
+        "quick_link": "INT NULL",
+        "memo": "INT NULL",
+    }
     columns = {item["name"] for item in inspect(engine).get_columns("event_reminder")}
     additions = {
         "schedule_type": "VARCHAR(20) NOT NULL DEFAULT 'once'",
@@ -37,6 +44,11 @@ def ensure_schema():
     }
     timezone_added = "timezone" not in columns
     with engine.begin() as conn:
+        for table, ddl in project_tables.items():
+            table_columns = {item["name"] for item in inspect(engine).get_columns(table)}
+            if "project_id" not in table_columns:
+                conn.execute(text(f"ALTER TABLE `{table}` ADD COLUMN project_id {ddl}"))
+                conn.execute(text(f"CREATE INDEX `idx_{table}_project_id` ON `{table}` (project_id)"))
         for name, ddl in additions.items():
             if name not in columns:
                 conn.execute(text(f"ALTER TABLE event_reminder ADD COLUMN {name} {ddl}"))

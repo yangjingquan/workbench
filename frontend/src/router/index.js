@@ -6,6 +6,8 @@ const routes = [
   { path: '/', component: () => import('../layouts/AppLayout.vue'), children: [
     { path: '', redirect: '/dashboard' },
     { path: 'dashboard', component: () => import('../pages/Dashboard.vue'), meta: { title: '总览看板' } },
+    { path: 'projects', component: () => import('../pages/Projects.vue'), meta: { title: '项目管理' } },
+    { path: 'projects/:id', component: () => import('../pages/ProjectDetail.vue'), meta: { title: '项目详情' } },
     { path: 'records', component: () => import('../pages/Records.vue'), meta: { title: '工作记录' } },
     { path: 'plans', component: () => import('../pages/Plans.vue'), meta: { title: '工作计划' } },
     { path: 'reminders', component: () => import('../pages/Reminders.vue'), meta: { title: '事件提醒' } },

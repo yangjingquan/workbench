@@ -4,6 +4,7 @@
   <div class="panel memo-editor">
     <div class="panel-header"><div><div class="panel-title">{{ editingMemoId ? '编辑备忘录' : '录入信息' }}</div><div class="panel-subtitle">标题和内容都填写后才可以保存</div></div><el-button v-if="editingMemoId" @click="cancelEdit">取消编辑</el-button></div>
     <el-form label-position="top" @submit.prevent="saveMemo">
+      <el-form-item label="归属项目"><el-select v-model="form.project_id" clearable placeholder="未归属项目" style="width:100%"><el-option v-for="project in app.projects" :key="project.id" :label="project.name" :value="project.id" /></el-select></el-form-item>
       <el-form-item label="标题"><el-input v-model="form.title" maxlength="200" show-word-limit placeholder="输入备忘录标题" /></el-form-item>
       <el-form-item label="内容"><el-input v-model="form.content" type="textarea" :autosize="{ minRows: 5, maxRows: 12 }" placeholder="输入需要保存的文字内容" /></el-form-item>
       <el-button type="primary" :loading="saving" @click="saveMemo">{{ editingMemoId ? '保存修改' : '保存' }}</el-button>
@@ -36,21 +37,22 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../api/http'
+import { useAppStore } from '../stores'
 
-const form = reactive({ title: '', content: '' }); const keyword = ref(''); const memos = ref([]); const selectedId = ref(null); const saving = ref(false); const editingMemoId = ref(null)
+const app = useAppStore(); const form = reactive({ title: '', content: '', project_id: null }); const keyword = ref(''); const memos = ref([]); const selectedId = ref(null); const saving = ref(false); const editingMemoId = ref(null)
 const selectedMemo = computed(() => memos.value.find(item => item.id === selectedId.value) || null)
 function formatDate(value) { return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '' }
 async function loadMemos() {
-  memos.value = (await api.memos(keyword.value.trim())).data || []
+  memos.value = (await api.memos({ keyword: keyword.value.trim(), project_id: app.currentProjectId || undefined })).data || []
   if (!memos.value.some(item => item.id === selectedId.value)) selectedId.value = memos.value[0]?.id || null
 }
 async function saveMemo() {
   if (!form.title.trim() || !form.content.trim()) return ElMessage.warning('标题和内容都不能为空')
   saving.value = true
-  try { if (editingMemoId.value) await api.updateMemo(editingMemoId.value, { title: form.title.trim(), content: form.content.trim() }); else await api.memo({ title: form.title.trim(), content: form.content.trim() }); form.title = ''; form.content = ''; editingMemoId.value = null; await loadMemos(); ElMessage.success('备忘录已保存') } finally { saving.value = false }
+  try { if (editingMemoId.value) await api.updateMemo(editingMemoId.value, { title: form.title.trim(), content: form.content.trim(), project_id: form.project_id }); else await api.memo({ title: form.title.trim(), content: form.content.trim(), project_id: form.project_id }); form.title = ''; form.content = ''; form.project_id = app.currentProjectId || null; editingMemoId.value = null; await loadMemos(); ElMessage.success('备忘录已保存') } finally { saving.value = false }
 }
-function startEdit(memo) { selectedId.value = memo.id; editingMemoId.value = memo.id; form.title = memo.title; form.content = memo.content }
-function cancelEdit() { editingMemoId.value = null; form.title = ''; form.content = '' }
+function startEdit(memo) { selectedId.value = memo.id; editingMemoId.value = memo.id; form.title = memo.title; form.content = memo.content; form.project_id = memo.project_id || null }
+function cancelEdit() { editingMemoId.value = null; form.title = ''; form.content = ''; form.project_id = app.currentProjectId || null }
 async function removeMemo(memo) { await ElMessageBox.confirm(`确定删除备忘录“${memo.title}”吗？`, '删除确认', { type: 'warning' }); await api.deleteMemo(memo.id); if (editingMemoId.value === memo.id) cancelEdit(); selectedId.value = null; await loadMemos(); ElMessage.success('备忘录已删除') }
 async function copyMemo() {
   if (!selectedMemo.value) return
@@ -59,5 +61,6 @@ async function copyMemo() {
 }
 let searchTimer
 watch(keyword, () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadMemos, 250) })
-onMounted(loadMemos)
+watch(() => app.currentProjectId, loadMemos)
+onMounted(() => app.loadProjectContext().then(loadMemos).catch(loadMemos))
 </script>

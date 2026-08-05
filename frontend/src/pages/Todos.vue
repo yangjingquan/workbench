@@ -52,6 +52,7 @@
 
   <el-dialog v-model="dialog" :title="editing ? '编辑任务' : '新建任务'" width="580px">
     <el-form :model="form" label-width="78px">
+      <el-form-item label="归属项目"><el-select v-model="form.project_id" clearable placeholder="未归属项目" style="width:100%"><el-option v-for="project in app.projects" :key="project.id" :label="project.name" :value="project.id" /></el-select></el-form-item>
       <el-form-item label="任务标题"><el-input v-model="form.title" /></el-form-item>
       <el-form-item label="任务描述"><el-input v-model="form.description" type="textarea" :rows="3" /></el-form-item>
       <el-form-item label="临时笔记"><el-input v-model="form.notes" type="textarea" :rows="2" placeholder="粘贴临时文字笔记" /></el-form-item>
@@ -65,13 +66,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../api/http'
+import { useAppStore } from '../stores'
 
-const rows = ref([]); const selected = ref([]); const keyword = ref(''); const showArchive = ref(false); const dragging = ref(null); const pointerId = ref(null); const pointerDragging = ref(false); const dialog = ref(false); const editing = ref(null); const subDialog = ref(false); const subTitle = ref(''); const subTask = ref(null); const subEditing = ref(null)
+const app = useAppStore(); const rows = ref([]); const selected = ref([]); const keyword = ref(''); const showArchive = ref(false); const dragging = ref(null); const pointerId = ref(null); const pointerDragging = ref(false); const dialog = ref(false); const editing = ref(null); const subDialog = ref(false); const subTitle = ref(''); const subTask = ref(null); const subEditing = ref(null)
 const columns = [{ key: 'todo', label: '待处理' }, { key: 'doing', label: '进行中' }, { key: 'done', label: '已完成' }]
-const priorityMap = { high: '高优先级', medium: '中优先级', low: '低优先级' }; const tagOptions = ['开发需求', 'BUG 修复', '学习任务', '日常琐事']; const form = reactive({ title: '', description: '', notes: '', status: 'todo', priority: 'medium', due_at: null, group_name: '默认分组', tags: [] }); const priorityWeight = { high: 3, medium: 2, low: 1 }
+const priorityMap = { high: '高优先级', medium: '中优先级', low: '低优先级' }; const tagOptions = ['开发需求', 'BUG 修复', '学习任务', '日常琐事']; const form = reactive({ title: '', description: '', notes: '', status: 'todo', priority: 'medium', due_at: null, group_name: '默认分组', tags: [], project_id: null }); const priorityWeight = { high: 3, medium: 2, low: 1 }
 
 const grouped = computed(() => Object.fromEntries(columns.map(column => {
   let list = rows.value.filter(item => item.status === column.key)
@@ -81,8 +83,8 @@ const grouped = computed(() => Object.fromEntries(columns.map(column => {
 
 function formatDueAt(dueAt) { if (!dueAt) return '无截止时间'; const date = new Date(dueAt); const days = ['日', '一', '二', '三', '四', '五', '六']; const pad = value => String(value).padStart(2, '0'); return `截止 ${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}(星期${days[date.getDay()]})` }
 function isOverdue(task) { return task.due_at && new Date(task.due_at) < new Date() && task.status !== 'done' }
-async function load() { rows.value = (await api.todos({ include_archived: showArchive.value, keyword: keyword.value })).data }
-function openCreate() { editing.value = null; Object.assign(form, { title: '', description: '', notes: '', status: 'todo', priority: 'medium', due_at: null, group_name: '默认分组', tags: [] }); dialog.value = true }
+async function load() { rows.value = (await api.todos({ include_archived: showArchive.value, keyword: keyword.value, project_id: app.currentProjectId || undefined })).data }
+function openCreate() { editing.value = null; Object.assign(form, { title: '', description: '', notes: '', status: 'todo', priority: 'medium', due_at: null, group_name: '默认分组', tags: [], project_id: app.currentProjectId || null }); dialog.value = true }
 function edit(task) { editing.value = task.id; Object.assign(form, { ...task, tags: task.tags || [] }); dialog.value = true }
 async function save() { if (!form.title) return ElMessage.warning('请填写任务标题'); editing.value ? await api.updateTodo(editing.value, form) : await api.todo(form); dialog.value = false; ElMessage.success('已保存'); load() }
 function toggleSelect(id) { selected.value = selected.value.includes(id) ? selected.value.filter(item => item !== id) : [...selected.value, id] }
@@ -100,5 +102,5 @@ function editSubtask(task, subtask) { subTask.value = task; subEditing.value = s
 async function saveSub() { const title = subTitle.value.trim(); if (!title) return ElMessage.warning('请填写子任务标题'); if (subEditing.value) await api.updateSubtask(subTask.value.id, subEditing.value, { title }); else await api.addSubtask(subTask.value.id, { title }); subDialog.value = false; await load() }
 async function toggleSubtask(task, subtask, completed) { await api.updateSubtask(task.id, subtask.id, { completed }); await load() }
 async function removeSubtask(task, subtask) { await ElMessageBox.confirm(`确定删除子任务“${subtask.title}”吗？`, '删除确认', { type: 'warning' }); await api.deleteSubtask(task.id, subtask.id); await load() }
-onMounted(load)
+watch(() => app.currentProjectId, load); onMounted(() => app.loadProjectContext().then(load).catch(load))
 </script>

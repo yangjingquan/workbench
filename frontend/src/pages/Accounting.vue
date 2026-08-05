@@ -6,7 +6,7 @@
 
   <div class="account-entry-grid">
     <div class="panel account-entry-form">
-      <div class="panel-header"><div><div class="panel-title">新增账目</div><div class="panel-subtitle">支出和进账都可以按自己的分类记录</div></div></div>
+      <div class="panel-header"><div><div class="panel-title">{{ editingEntryId ? '编辑账目' : '新增账目' }}</div><div class="panel-subtitle">支出和进账都可以按自己的分类记录</div></div><el-button v-if="editingEntryId" @click="cancelEditEntry">取消编辑</el-button></div>
       <el-form label-position="top" @submit.prevent="saveEntry">
         <div class="two-col">
           <el-form-item label="账目类型">
@@ -30,7 +30,7 @@
           </el-form-item>
         </div>
         <el-form-item label="备注（可选）"><el-input v-model="form.note" placeholder="例如：午餐、项目奖金" /></el-form-item>
-        <el-button type="primary" :loading="entryLoading" @click="saveEntry">保存账目</el-button>
+        <el-button type="primary" :loading="entryLoading" @click="saveEntry">{{ editingEntryId ? '保存修改' : '保存账目' }}</el-button>
       </el-form>
     </div>
 
@@ -84,7 +84,7 @@
       <el-table-column prop="category" label="分类" width="150" />
       <el-table-column prop="note" label="备注" min-width="180" show-overflow-tooltip />
       <el-table-column label="金额" width="150"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(scope.row.amount) }}</span></template></el-table-column>
-      <el-table-column label="操作" width="80"><template #default="scope"><el-button link type="danger" @click="removeEntry(scope.row.id)">删除</el-button></template></el-table-column>
+      <el-table-column label="操作" width="140"><template #default="scope"><el-button link type="primary" @click="startEditEntry(scope.row)">编辑</el-button><el-button link type="danger" @click="removeEntry(scope.row.id)">删除</el-button></template></el-table-column>
       <template #empty><el-empty description="当前期间暂无账目" /></template>
     </el-table></div>
     <div class="mobile-accounting-list">
@@ -92,7 +92,7 @@
         <div class="mobile-accounting-card-header"><span>{{ item.entry_date }}</span><span :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '进账' : '支出' }}</span></div>
         <div class="mobile-entry-category"><span>分类</span><b>{{ item.category }}</b></div>
         <p v-if="item.note" class="mobile-entry-note">{{ item.note }}</p>
-        <div class="mobile-entry-footer"><b :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(item.amount) }}</b><el-button link type="danger" @click="removeEntry(item.id)">删除</el-button></div>
+        <div class="mobile-entry-footer"><b :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(item.amount) }}</b><span><el-button link type="primary" @click="startEditEntry(item)">编辑</el-button><el-button link type="danger" @click="removeEntry(item.id)">删除</el-button></span></div>
       </article>
       <el-empty v-if="!entries.length" description="当前期间暂无账目" />
     </div>
@@ -109,7 +109,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../api/http'
 
@@ -122,7 +122,7 @@ function formatMoney(value) { return Number(value || 0).toFixed(2) }
 const now = new Date()
 const form = reactive({ entry_type: 'expense', amount: 0, category: '', note: '', entry_date: dateValue(now) })
 const categoryForm = reactive({ entry_type: 'expense', name: '' })
-const categories = ref([]); const entries = ref([]); const categoryDialog = ref(false); const entryLoading = ref(false)
+const categories = ref([]); const entries = ref([]); const categoryDialog = ref(false); const entryLoading = ref(false); const editingEntryId = ref(null)
 const statPeriod = ref('month'); const statAnchor = ref(monthValue(now))
 const summary = ref({ start: '', end: '', total_income: 0, total_expense: 0, balance: 0, by_category: [], trend: [] })
 const currentCategories = computed(() => categories.value.filter(item => item.entry_type === form.entry_type))
@@ -137,11 +137,13 @@ async function loadSummary() {
 async function saveEntry() {
   if (!form.amount || form.amount <= 0 || !form.category || !form.entry_date) return ElMessage.warning('请填写金额、分类和日期')
   entryLoading.value = true
-  try { await api.accountEntry({ ...form }); form.amount = 0; form.note = ''; await loadSummary(); ElMessage.success('账目已保存') } finally { entryLoading.value = false }
+  try { if (editingEntryId.value) await api.updateAccountEntry(editingEntryId.value, { ...form }); else await api.accountEntry({ ...form }); editingEntryId.value = null; form.amount = 0; form.note = ''; await loadSummary(); ElMessage.success('账目已保存') } finally { entryLoading.value = false }
 }
+function startEditEntry(entry) { editingEntryId.value = entry.id; Object.assign(form, { entry_type: entry.entry_type, amount: entry.amount, category: entry.category, note: entry.note || '', entry_date: entry.entry_date }); nextTick(() => { form.category = entry.category }); document.querySelector('.content-scroll')?.scrollTo({ top: 0, behavior: 'smooth' }) }
+function cancelEditEntry() { editingEntryId.value = null; form.amount = 0; form.note = ''; syncCategory() }
 async function removeEntry(id) {
   await ElMessageBox.confirm('确定删除这笔账目吗？', '删除确认', { type: 'warning' })
-  await api.deleteAccountEntry(id); await loadSummary(); ElMessage.success('账目已删除')
+  await api.deleteAccountEntry(id); if (editingEntryId.value === id) cancelEditEntry(); await loadSummary(); ElMessage.success('账目已删除')
 }
 async function saveCategory() {
   if (!categoryForm.name.trim()) return ElMessage.warning('请输入分类名称')

@@ -48,7 +48,7 @@
         </aside>
       </div>
     </Transition>
-    <el-dialog v-model="searchOpen" title="全局检索" width="680px" class="search-dialog"><el-input v-model="keyword" autofocus placeholder="检索工作记录、计划、待办和链接" :prefix-icon="Search" @keyup.enter="doSearch" /><div v-if="results" class="search-results"><div v-for="(items, key) in results" :key="key" class="search-group"><div class="search-group-title">{{ groupNames[key] }} · {{ items.length }}</div><div v-for="item in items" :key="item.id" class="search-result"><span>{{ item.title || item.name }}</span><small>{{ item.content || item.description || item.url || '' }}</small></div></div><el-empty v-if="!Object.values(results).some(x => x.length)" description="没有找到匹配内容" /></div></el-dialog>
+    <el-dialog v-model="searchOpen" title="全局检索" width="680px" class="search-dialog"><el-input v-model="keyword" autofocus placeholder="检索工作记录、计划、待办、链接和备忘录" :prefix-icon="Search" @keyup.enter="doSearch" /><div v-if="results" class="search-results"><div v-for="(items, key) in results" :key="key" class="search-group"><div class="search-group-title">{{ groupNames[key] }} · {{ items.length }}</div><button v-for="item in items" :key="item.id" class="search-result" type="button" @click="goToSearchResult(key, item)"><span>{{ item.title || item.name }}</span><small>{{ item.content || item.description || item.url || '' }}</small></button></div><el-empty v-if="!Object.values(results).some(x => x.length)" description="没有找到匹配内容" /></div></el-dialog>
     <ReminderPoll />
   </div>
 </template>
@@ -101,5 +101,6 @@ watch(() => route.fullPath, closeMobileMenu)
 const mainNav = [{ path: '/dashboard', label: '总览看板', icon: Odometer }, { path: '/records', label: '工作记录', icon: List }, { path: '/plans', label: '工作计划', icon: Calendar }, { path: '/reminders', label: '事件提醒', icon: Bell }, { path: '/todos', label: 'Todo 看板', icon: List }, { path: '/links', label: '快捷导航', icon: Link }]
 const groupNames = { records: '工作记录', plans: '计划', todos: '待办', links: '链接', memos: '备忘录' }
 async function doSearch() { if (!keyword.value.trim()) return; results.value = (await api.search(keyword.value)).data }
+function goToSearchResult(type) { const target = { records: '/records', plans: '/plans', todos: '/todos', links: '/links', memos: '/memos' }[type]; if (!target) return; searchOpen.value = false; router.push(target) }
 async function handleUserCommand(command) { if (command === 'profile') return router.push('/profile'); app.clearSession(); await router.replace('/login'); ElMessage.success('已退出登录') }
 </script>

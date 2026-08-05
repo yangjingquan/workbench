@@ -36,7 +36,15 @@
           <el-dropdown><span style="cursor:pointer">···</span><template #dropdown><el-dropdown-menu><el-dropdown-item @click="edit(task)">编辑</el-dropdown-item><el-dropdown-item @click="addSub(task)">添加子任务</el-dropdown-item><el-dropdown-item @click="archiveOrRestore(task)">{{ task.archived ? '恢复到看板' : '归档' }}</el-dropdown-item><el-dropdown-item divided @click="remove(task.id)">删除</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
         </div>
         <div class="todo-mobile-move"><span>移动到</span><el-select :model-value="task.status" size="small" @change="moveTask(task, $event)"><el-option v-for="option in columns" :key="option.key" :label="option.label" :value="option.key" /></el-select></div>
-        <div v-if="task.subtasks?.length" class="subtasks">{{ task.subtasks.filter(x => x.completed).length }}/{{ task.subtasks.length }} 个子任务</div>
+        <div v-if="task.subtasks?.length" class="subtasks">
+          <div class="subtasks-header"><span>{{ task.subtasks.filter(x => x.completed).length }}/{{ task.subtasks.length }} 个子任务</span><span class="muted-text">可直接勾选完成</span></div>
+          <div v-for="subtask in task.subtasks" :key="subtask.id" class="subtask-item">
+            <input type="checkbox" :checked="subtask.completed" :aria-label="`完成子任务：${subtask.title}`" @change="toggleSubtask(task, subtask, $event.target.checked)" />
+            <span :class="{ 'subtask-done': subtask.completed }">{{ subtask.title }}</span>
+            <button type="button" class="subtask-action" @click.stop="editSubtask(task, subtask)">编辑</button>
+            <button type="button" class="subtask-action danger" @click.stop="removeSubtask(task, subtask)">删除</button>
+          </div>
+        </div>
       </div>
       <el-empty v-if="!grouped[col.key].length" description="拖任务到这里" :image-size="45" />
     </div>
@@ -53,15 +61,15 @@
     <template #footer><el-button @click="dialog = false">取消</el-button><el-button type="primary" @click="save">保存任务</el-button></template>
   </el-dialog>
 
-  <el-dialog v-model="subDialog" title="添加子任务" width="420px"><el-input v-model="subTitle" placeholder="例如：补充单元测试" /><template #footer><el-button @click="subDialog = false">取消</el-button><el-button type="primary" @click="saveSub">添加</el-button></template></el-dialog>
+  <el-dialog v-model="subDialog" :title="subEditing ? '编辑子任务' : '添加子任务'" width="420px"><el-input v-model="subTitle" placeholder="例如：补充单元测试" @keyup.enter="saveSub" /><template #footer><el-button @click="subDialog = false">取消</el-button><el-button type="primary" @click="saveSub">保存</el-button></template></el-dialog>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../api/http'
 
-const rows = ref([]); const selected = ref([]); const keyword = ref(''); const showArchive = ref(false); const dragging = ref(null); const pointerId = ref(null); const pointerDragging = ref(false); const dialog = ref(false); const editing = ref(null); const subDialog = ref(false); const subTitle = ref(''); const subTask = ref(null)
+const rows = ref([]); const selected = ref([]); const keyword = ref(''); const showArchive = ref(false); const dragging = ref(null); const pointerId = ref(null); const pointerDragging = ref(false); const dialog = ref(false); const editing = ref(null); const subDialog = ref(false); const subTitle = ref(''); const subTask = ref(null); const subEditing = ref(null)
 const columns = [{ key: 'todo', label: '待处理' }, { key: 'doing', label: '进行中' }, { key: 'done', label: '已完成' }]
 const priorityMap = { high: '高优先级', medium: '中优先级', low: '低优先级' }; const tagOptions = ['开发需求', 'BUG 修复', '学习任务', '日常琐事']; const form = reactive({ title: '', description: '', notes: '', status: 'todo', priority: 'medium', due_at: null, group_name: '默认分组', tags: [] }); const priorityWeight = { high: 3, medium: 2, low: 1 }
 
@@ -87,7 +95,10 @@ async function remove(id) { await api.deleteTodo(id); await load() }
 async function archiveOrRestore(task) { if (task.archived) { await api.restoreTodo(task.id); ElMessage.success('已恢复到看板') } else { await api.archiveTodo(task.id); ElMessage.success('已归档') } await load() }
 async function batch(action) { await api.batchTodos(action, selected.value); selected.value = []; await load() }
 async function toggleTimer(task) { await api.timerTodo(task.id, task.timer_started_at ? 'stop' : 'start'); ElMessage.success(task.timer_started_at ? '计时已结束并生成工作记录' : '已开始计时'); await load() }
-function addSub(task) { subTask.value = task; subTitle.value = ''; subDialog.value = true }
-async function saveSub() { if (!subTitle.value) return; await api.addSubtask(subTask.value.id, { title: subTitle.value }); subDialog.value = false; await load() }
+function addSub(task) { subTask.value = task; subEditing.value = null; subTitle.value = ''; subDialog.value = true }
+function editSubtask(task, subtask) { subTask.value = task; subEditing.value = subtask.id; subTitle.value = subtask.title; subDialog.value = true }
+async function saveSub() { const title = subTitle.value.trim(); if (!title) return ElMessage.warning('请填写子任务标题'); if (subEditing.value) await api.updateSubtask(subTask.value.id, subEditing.value, { title }); else await api.addSubtask(subTask.value.id, { title }); subDialog.value = false; await load() }
+async function toggleSubtask(task, subtask, completed) { await api.updateSubtask(task.id, subtask.id, { completed }); await load() }
+async function removeSubtask(task, subtask) { await ElMessageBox.confirm(`确定删除子任务“${subtask.title}”吗？`, '删除确认', { type: 'warning' }); await api.deleteSubtask(task.id, subtask.id); await load() }
 onMounted(load)
 </script>

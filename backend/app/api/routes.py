@@ -223,6 +223,11 @@ class SubtaskIn(BaseModel):
     title: str
 
 
+class SubtaskUpdateIn(BaseModel):
+    title: str | None = None
+    completed: bool | None = None
+
+
 class LinkIn(BaseModel):
     title: str
     url: str
@@ -441,6 +446,29 @@ def todo_dict(row: TodoTask):
     return result
 
 
+def _upsert_todo_work_record(task: TodoTask, user_id: int, db: Session, hours: float) -> None:
+    """Keep one work record per Todo and add later timer sessions to it."""
+    if not task.id or hours <= 0:
+        return
+    existing = db.scalar(
+        select(WorkRecord)
+        .where(WorkRecord.user_id == user_id, WorkRecord.task_id == task.id)
+        .order_by(WorkRecord.id)
+    )
+    if existing:
+        existing.hours = round((existing.hours or 0) + hours, 4)
+        return
+    db.add(WorkRecord(
+        user_id=user_id,
+        title=task.title[:200],
+        content=task.notes or task.description,
+        work_date=date.today(),
+        hours=round(hours, 4),
+        tags=list(task.tags or []),
+        task_id=task.id,
+    ))
+
+
 def _ensure_todo_completion_record(task: TodoTask, user_id: int, db: Session) -> None:
     """Create one linked work record the first time a Todo reaches done."""
     if not task.id:
@@ -450,15 +478,20 @@ def _ensure_todo_completion_record(task: TodoTask, user_id: int, db: Session) ->
         return
     content_parts = [value.strip() for value in (task.description, task.notes) if value and value.strip()]
     completed_at = task.completed_at or datetime.now()
+    elapsed_seconds = task.elapsed_seconds or 0
     db.add(WorkRecord(
         user_id=user_id,
         title=task.title[:200],
         content="\n\n".join(content_parts),
         work_date=completed_at.date(),
-        hours=round((task.elapsed_seconds or 0) / 3600, 2),
+        hours=round(elapsed_seconds / 3600, 4),
         tags=list(task.tags or []),
         task_id=task.id,
     ))
+    if elapsed_seconds:
+        # The completion record has persisted the paused/previous sessions.
+        # Reset the accumulator so a later stop only adds a new session.
+        task.elapsed_seconds = 0
 
 
 @router.get("/todos")
@@ -524,7 +557,7 @@ def todo_timer(item_id: int, action: str = Query(..., pattern="^(start|pause|sto
             task.elapsed_seconds += max(0, int((now - task.timer_started_at).total_seconds()))
         task.timer_started_at = None
         if action == "stop" and task.elapsed_seconds:
-            db.add(WorkRecord(user_id=user.id, title=f"任务计时：{task.title}", content=task.notes or task.description, work_date=date.today(), hours=round(task.elapsed_seconds / 3600, 2), tags=task.tags or [], task_id=task.id))
+            _upsert_todo_work_record(task, user.id, db, task.elapsed_seconds / 3600)
             task.elapsed_seconds = 0
     db.commit(); db.refresh(task); return ok(todo_dict(task), "计时已更新")
 
@@ -540,7 +573,32 @@ def delete_todo(item_id: int, db: Session = Depends(get_db), user: User = Depend
 def add_subtask(item_id: int, payload: SubtaskIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     task = db.scalar(select(TodoTask).where(TodoTask.id == item_id, TodoTask.user_id == user.id))
     if not task: raise HTTPException(404, "待办不存在")
-    item = TodoSubtask(task_id=item_id, title=payload.title); db.add(item); db.commit(); db.refresh(task); return ok(todo_dict(task), "子任务已添加")
+    title = payload.title.strip()
+    if not title: raise HTTPException(400, "子任务标题不能为空")
+    item = TodoSubtask(task_id=item_id, title=title); db.add(item); db.commit(); db.refresh(task); return ok(todo_dict(task), "子任务已添加")
+
+
+@router.patch("/todos/{item_id}/subtasks/{subtask_id}")
+def update_subtask(item_id: int, subtask_id: int, payload: SubtaskUpdateIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    task = db.scalar(select(TodoTask).where(TodoTask.id == item_id, TodoTask.user_id == user.id))
+    if not task: raise HTTPException(404, "待办不存在")
+    item = db.scalar(select(TodoSubtask).where(TodoSubtask.id == subtask_id, TodoSubtask.task_id == item_id))
+    if not item: raise HTTPException(404, "子任务不存在")
+    if payload.title is not None:
+        title = payload.title.strip()
+        if not title: raise HTTPException(400, "子任务标题不能为空")
+        item.title = title
+    if payload.completed is not None: item.completed = payload.completed
+    db.commit(); db.refresh(task); return ok(todo_dict(task), "子任务已更新")
+
+
+@router.delete("/todos/{item_id}/subtasks/{subtask_id}")
+def delete_subtask(item_id: int, subtask_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    task = db.scalar(select(TodoTask).where(TodoTask.id == item_id, TodoTask.user_id == user.id))
+    if not task: raise HTTPException(404, "待办不存在")
+    item = db.scalar(select(TodoSubtask).where(TodoSubtask.id == subtask_id, TodoSubtask.task_id == item_id))
+    if not item: raise HTTPException(404, "子任务不存在")
+    db.delete(item); db.commit(); return ok(msg="子任务已删除")
 
 
 @router.patch("/todos/{item_id}/archive")
@@ -781,4 +839,15 @@ def dashboard(month: str | None = None, db: Session = Depends(get_db), user: Use
     done = db.scalar(select(func.count(TodoTask.id)).where(TodoTask.user_id == user.id, TodoTask.status == "done", TodoTask.archived.is_(False))) or 0
     records = db.execute(select(WorkRecord.work_date, func.sum(WorkRecord.hours)).where(WorkRecord.user_id == user.id, WorkRecord.work_date.between(month_start, month_end)).group_by(WorkRecord.work_date).order_by(WorkRecord.work_date)).all()
     tools = db.execute(select(ToolUsageLog.tool_name, func.count(ToolUsageLog.id)).where(ToolUsageLog.user_id == user.id).group_by(ToolUsageLog.tool_name).order_by(desc(func.count(ToolUsageLog.id)))).all()
-    return ok({"cards": {"hours": round(float(hours), 1), "todo_total": total, "todo_done": done, "completion_rate": round(done / total * 100) if total else 0}, "work_trend": [{"date": str(d), "hours": float(h)} for d, h in records], "tool_usage": [{"name": n, "count": c} for n, c in tools]})
+    focus_tasks = []
+    active_tasks = db.scalars(select(TodoTask).where(TodoTask.user_id == user.id, TodoTask.archived.is_(False), TodoTask.timer_started_at.is_not(None)).order_by(TodoTask.timer_started_at)).all()
+    for task in active_tasks:
+        focus_tasks.append({
+            "id": task.id,
+            "title": task.title,
+            "status": task.status,
+            "priority": task.priority,
+            "timer_started_at": task.timer_started_at,
+            "elapsed_seconds": task.elapsed_seconds or 0,
+        })
+    return ok({"cards": {"hours": round(float(hours), 1), "todo_total": total, "todo_done": done, "completion_rate": round(done / total * 100) if total else 0}, "focus_tasks": focus_tasks, "work_trend": [{"date": str(d), "hours": float(h)} for d, h in records], "tool_usage": [{"name": n, "count": c} for n, c in tools]})

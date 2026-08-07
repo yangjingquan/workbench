@@ -305,7 +305,6 @@ class LinkIn(BaseModel):
     url: str
     category: str = "未分类"
     description: str = ""
-    project_id: int | None = None
 
 
 class UsageIn(BaseModel):
@@ -953,16 +952,13 @@ def restore_todo(item_id: int, db: Session = Depends(get_db), user: User = Depen
 
 
 @router.get("/quick-links")
-def list_links(project_id: int | None = None, workspace_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_links(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     query = select(QuickLink).where(QuickLink.user_id == user.id)
-    if project_id is not None: query = query.where(QuickLink.project_id == _project_for_user(project_id, user, db))
-    elif workspace_id is not None: query = query.where(QuickLink.project_id.in_(_workspace_project_ids(workspace_id, user, db)))
     return ok([dump(row) for row in db.scalars(query.order_by(QuickLink.position, QuickLink.id)).all()])
 
 
 @router.post("/quick-links")
 def create_link(payload: LinkIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    payload.project_id = _project_for_user(payload.project_id, user, db)
     row = QuickLink(user_id=user.id, **payload.model_dump()); db.add(row); db.commit(); db.refresh(row); return ok(dump(row), "链接已添加")
 
 
@@ -970,7 +966,6 @@ def create_link(payload: LinkIn, db: Session = Depends(get_db), user: User = Dep
 def update_link(item_id: int, payload: LinkIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     row = db.scalar(select(QuickLink).where(QuickLink.id == item_id, QuickLink.user_id == user.id))
     if not row: raise HTTPException(404, "链接不存在")
-    payload.project_id = _project_for_user(payload.project_id, user, db)
     for key, value in payload.model_dump().items(): setattr(row, key, value)
     db.commit(); db.refresh(row); return ok(dump(row), "链接已更新")
 
@@ -1179,7 +1174,7 @@ def global_search(keyword: str, project_id: int | None = None, workspace_id: int
     records = db.scalars(select(WorkRecord).where(*scope(WorkRecord), or_(WorkRecord.title.like(like), WorkRecord.content.like(like))).limit(10)).all()
     plans = db.scalars(select(WorkPlan).where(*scope(WorkPlan), or_(WorkPlan.title.like(like), WorkPlan.description.like(like))).limit(10)).all()
     todos = db.scalars(select(TodoTask).where(*scope(TodoTask), or_(TodoTask.title.like(like), TodoTask.description.like(like), TodoTask.notes.like(like))).limit(10)).all()
-    links = db.scalars(select(QuickLink).where(*scope(QuickLink), or_(QuickLink.title.like(like), QuickLink.url.like(like), QuickLink.description.like(like))).limit(10)).all()
+    links = db.scalars(select(QuickLink).where(QuickLink.user_id == user.id, or_(QuickLink.title.like(like), QuickLink.url.like(like), QuickLink.description.like(like))).limit(10)).all()
     memos = db.scalars(select(Memo).where(*scope(Memo), or_(Memo.title.like(like), Memo.content.like(like))).limit(10)).all()
     return ok({"records": [dump(x) for x in records], "plans": [dump(x) for x in plans], "todos": [todo_dict(x) for x in todos], "links": [dump(x) for x in links], "memos": [dump(x) for x in memos]})
 

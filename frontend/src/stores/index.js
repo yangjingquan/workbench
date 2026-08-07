@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { api } from '../api/http'
+import { api, resetAuthExpiredGuard } from '../api/http'
 import { nextAccentTheme, normalizeAccentTheme } from '../utils/theme'
 
 export const useAppStore = defineStore('app', () => {
@@ -16,7 +16,7 @@ export const useAppStore = defineStore('app', () => {
   const isLoggedIn = computed(() => Boolean(token.value))
   const projects = computed(() => workspaces.value.flatMap(workspace => (workspace.projects || []).map(project => ({ ...project, workspace_name: workspace.name, workspace_color: workspace.color }))))
   const currentProject = computed(() => projects.value.find(project => project.id === currentProjectId.value) || null)
-  function setSession(payload) { token.value = payload.token; user.value = payload.user; localStorage.setItem('workbench_token', payload.token); localStorage.setItem('workbench_user', JSON.stringify(payload.user)) }
+  function setSession(payload) { resetAuthExpiredGuard(); token.value = payload.token; user.value = payload.user; localStorage.setItem('workbench_token', payload.token); localStorage.setItem('workbench_user', JSON.stringify(payload.user)) }
   function clearSession() { token.value = ''; user.value = null; localStorage.removeItem('workbench_token'); localStorage.removeItem('workbench_user') }
   async function toggleTheme() { theme.value = theme.value === 'light' ? 'dark' : 'light'; localStorage.setItem('workbench_theme', theme.value); document.documentElement.classList.toggle('dark', theme.value === 'dark'); if (isLoggedIn.value) await api.saveConfig({ theme: theme.value }).catch(() => {}) }
   function applyAccentTheme(value) { const normalized = normalizeAccentTheme(value); accentTheme.value = normalized; document.documentElement.dataset.accentTheme = normalized; return normalized }

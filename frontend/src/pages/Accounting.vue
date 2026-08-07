@@ -96,6 +96,7 @@
       </article>
       <el-empty v-if="!entries.length" description="当前期间暂无账目" />
     </div>
+    <div class="account-pagination"><el-pagination v-model:current-page="entryPage" v-model:page-size="entryPageSize" :page-sizes="[10, 20, 50, 100]" layout="total, sizes, prev, pager, next, jumper" :total="entryTotal" @current-change="loadEntries" @size-change="handlePageSizeChange" /></div>
   </div>
 
   <el-dialog v-model="categoryDialog" title="管理记账分类" width="460px">
@@ -122,7 +123,7 @@ function formatMoney(value) { return Number(value || 0).toFixed(2) }
 const now = new Date()
 const form = reactive({ entry_type: 'expense', amount: 0, category: '', note: '', entry_date: dateValue(now) })
 const categoryForm = reactive({ entry_type: 'expense', name: '' })
-const categories = ref([]); const entries = ref([]); const categoryDialog = ref(false); const entryLoading = ref(false); const editingEntryId = ref(null)
+const categories = ref([]); const entries = ref([]); const entryPage = ref(1); const entryPageSize = ref(20); const entryTotal = ref(0); const categoryDialog = ref(false); const entryLoading = ref(false); const editingEntryId = ref(null)
 const statPeriod = ref('month'); const statAnchor = ref(monthValue(now))
 const summary = ref({ start: '', end: '', total_income: 0, total_expense: 0, balance: 0, by_category: [], trend: [] })
 const currentCategories = computed(() => categories.value.filter(item => item.entry_type === form.entry_type))
@@ -130,9 +131,29 @@ const currentCategories = computed(() => categories.value.filter(item => item.en
 function syncCategory() { if (!currentCategories.value.some(item => item.name === form.category)) form.category = currentCategories.value[0]?.name || '' }
 async function loadCategories() { categories.value = (await api.accountCategories()).data || []; syncCategory() }
 async function loadSummary() {
+  entryPage.value = 1
   const data = (await api.accountSummary({ period: statPeriod.value, anchor: statAnchor.value })).data
   summary.value = data || summary.value
-  entries.value = (await api.accountEntries({ start: summary.value.start, end: summary.value.end })).data || []
+  await loadEntries()
+}
+async function loadEntries() {
+  const data = (await api.accountEntries({ start: summary.value.start, end: summary.value.end, page: entryPage.value, page_size: entryPageSize.value })).data || {}
+  if (Array.isArray(data)) {
+    entries.value = data
+    entryTotal.value = data.length
+    return
+  }
+  entries.value = data.items || []
+  entryTotal.value = data.total || 0
+  if (!entries.value.length && entryPage.value > 1 && entryTotal.value > 0) {
+    entryPage.value -= 1
+    await loadEntries()
+  }
+}
+function handlePageSizeChange(size) {
+  entryPageSize.value = size
+  entryPage.value = 1
+  loadEntries()
 }
 async function saveEntry() {
   if (!form.amount || form.amount <= 0 || !form.category || !form.entry_date) return ElMessage.warning('请填写金额、分类和日期')

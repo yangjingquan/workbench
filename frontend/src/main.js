@@ -8,6 +8,11 @@ import router from './router'
 import { useAppStore } from './stores'
 
 const pinia = createPinia()
-useAppStore(pinia).initTheme()
+const appStore = useAppStore(pinia)
+appStore.initTheme()
+window.addEventListener('workbench:auth-expired', () => {
+  appStore.clearSession()
+  if (router.currentRoute.value.path !== '/login') router.replace('/login')
+})
 
 createApp(App).use(pinia).use(router).use(ElementPlus).mount('#app')

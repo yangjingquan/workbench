@@ -41,6 +41,7 @@ html.dark { --bg: #10121c; --surface: #181b29; --surface-2: #202435; --line: #2b
 .memo-item { display:flex; flex-direction:column; align-items:flex-start; gap:6px; width:100%; padding:13px 14px; border:1px solid transparent; border-radius:10px; color:var(--text); background:transparent; text-align:left; transition:.2s }
 .memo-item:hover { background:var(--surface-2) }.memo-item.active { background:var(--primary-soft); border-color:#b8baff }.memo-item strong { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }.memo-item span { color:var(--muted); font-size:11px }
 .memo-detail { height:100%; display:flex; flex-direction:column }.memo-detail .panel-header { align-items:flex-start }.memo-content { flex:1; min-height:340px; padding:18px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); color:var(--text); white-space:pre-wrap; word-break:break-word; line-height:1.8 }
+.account-pagination { display:flex; justify-content:flex-end; padding:16px 4px 0; }
 @media (max-width:900px) { .account-entry-grid, .memo-layout { grid-template-columns:1fr } }
 @media (max-width:760px) { .account-stat-cards { grid-template-columns:1fr } .account-trend-item { gap:8px; grid-template-columns:1fr; } .category-create-row { flex-wrap:wrap } .category-create-row .el-input { flex:1 1 100% } }
 

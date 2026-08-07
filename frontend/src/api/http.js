@@ -2,18 +2,32 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
 const http = axios.create({ baseURL: import.meta.env.VITE_API_BASE || '', timeout: 12000 })
+let authExpiredHandled = false
+
+function forceLogout() {
+  if (authExpiredHandled) return
+  authExpiredHandled = true
+  localStorage.removeItem('workbench_token')
+  localStorage.removeItem('workbench_user')
+  window.dispatchEvent(new Event('workbench:auth-expired'))
+}
+
+export function resetAuthExpiredGuard() { authExpiredHandled = false }
+
 http.interceptors.request.use(config => {
   const token = localStorage.getItem('workbench_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 http.interceptors.response.use(response => response.data, error => {
-  if (error.response?.status === 401) {
-    localStorage.removeItem('workbench_token')
-    localStorage.removeItem('workbench_user')
-    if (location.pathname !== '/login' && !location.hash.endsWith('/login')) location.href = import.meta.env.VITE_DESKTOP === 'true' ? '#/login' : '/login'
+  const requestUrl = error.config?.url || ''
+  const isLoginRequest = /\/api\/auth\/(login|public-key)$/.test(requestUrl)
+  if (error.response?.status === 401 && localStorage.getItem('workbench_token') && !isLoginRequest) {
+    forceLogout()
+    ElMessage.warning('登录状态已失效，请重新登录')
+  } else {
+    ElMessage.error(error.response?.data?.msg || error.response?.data?.detail || '网络请求失败')
   }
-  ElMessage.error(error.response?.data?.msg || '网络请求失败')
   return Promise.reject(error)
 })
 

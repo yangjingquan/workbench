@@ -757,6 +757,16 @@ def _upsert_todo_work_record(task: TodoTask, user_id: int, db: Session, hours: f
     ))
 
 
+def _stop_todo_timer(task: TodoTask, user_id: int, db: Session, persist: bool = False) -> None:
+    """Pause the active timer and optionally persist the accumulated session."""
+    if task.timer_started_at:
+        task.elapsed_seconds += max(0, int((datetime.now() - task.timer_started_at).total_seconds()))
+        task.timer_started_at = None
+    if persist and task.elapsed_seconds:
+        _upsert_todo_work_record(task, user_id, db, task.elapsed_seconds / 3600)
+        task.elapsed_seconds = 0
+
+
 def _ensure_todo_completion_record(task: TodoTask, user_id: int, db: Session) -> None:
     """Create one linked work record the first time a Todo reaches done."""
     if not task.id:
@@ -809,7 +819,8 @@ def batch_todos(action: str = Query(..., pattern="^(complete|delete|archive)$"),
     for row in rows:
         if action == "delete": db.delete(row)
         elif action == "complete":
-            row.status = "done"; row.completed_at = row.completed_at or datetime.now(); _ensure_todo_completion_record(row, user.id, db)
+            _stop_todo_timer(row, user.id, db, persist=True)
+            row.status = "done"; row.completed_at = row.completed_at or datetime.now(); db.flush(); _ensure_todo_completion_record(row, user.id, db)
         else: row.archived = True
     db.commit(); return ok(msg="批量操作完成")
 
@@ -818,12 +829,21 @@ def batch_todos(action: str = Query(..., pattern="^(complete|delete|archive)$"),
 def update_todo(item_id: int, payload: TodoIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     row = db.scalar(select(TodoTask).where(TodoTask.id == item_id, TodoTask.user_id == user.id))
     if not row: raise HTTPException(404, "待办不存在")
+    previous_status = row.status
     payload.project_id = _project_for_user(payload.project_id, user, db)
     for key, value in payload.model_dump().items(): setattr(row, key, value)
-    if row.status == "done":
+    if row.status == "doing" and previous_status != "doing":
+        row.timer_started_at = datetime.now()
+        row.completed_at = None
+    elif row.status == "done":
+        if previous_status != "done": _stop_todo_timer(row, user.id, db, persist=True)
         row.completed_at = row.completed_at or datetime.now()
+        db.flush()
         _ensure_todo_completion_record(row, user.id, db)
-    elif row.status != "done":
+    elif previous_status == "doing" and row.status != "doing":
+        _stop_todo_timer(row, user.id, db, persist=True)
+        row.completed_at = None
+    else:
         row.completed_at = None
     db.commit(); db.refresh(row); return ok(todo_dict(row), "待办已更新")
 
@@ -832,8 +852,21 @@ def update_todo(item_id: int, payload: TodoIn, db: Session = Depends(get_db), us
 def update_todo_status(item_id: int, payload: TodoStatusIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     row = db.scalar(select(TodoTask).where(TodoTask.id == item_id, TodoTask.user_id == user.id))
     if not row: raise HTTPException(404, "待办不存在")
-    row.status = payload.status; row.completed_at = datetime.now() if payload.status == "done" else None
-    if payload.status == "done": _ensure_todo_completion_record(row, user.id, db)
+    if payload.status not in {"todo", "doing", "done"}:
+        raise HTTPException(400, "待办状态无效")
+    if payload.status == "doing":
+        if row.status != "doing":
+            row.timer_started_at = datetime.now()
+        row.completed_at = None
+    elif payload.status == "done":
+        _stop_todo_timer(row, user.id, db, persist=True)
+        row.completed_at = datetime.now()
+        db.flush()
+        _ensure_todo_completion_record(row, user.id, db)
+    else:
+        _stop_todo_timer(row, user.id, db, persist=True)
+        row.completed_at = None
+    row.status = payload.status
     db.commit(); return ok(todo_dict(row), "状态已更新")
 
 
@@ -845,12 +878,7 @@ def todo_timer(item_id: int, action: str = Query(..., pattern="^(start|pause|sto
     if action == "start":
         task.timer_started_at = now
     else:
-        if task.timer_started_at:
-            task.elapsed_seconds += max(0, int((now - task.timer_started_at).total_seconds()))
-        task.timer_started_at = None
-        if action == "stop" and task.elapsed_seconds:
-            _upsert_todo_work_record(task, user.id, db, task.elapsed_seconds / 3600)
-            task.elapsed_seconds = 0
+        _stop_todo_timer(task, user.id, db, persist=action == "stop")
     db.commit(); db.refresh(task); return ok(todo_dict(task), "计时已更新")
 
 
@@ -994,14 +1022,15 @@ def create_account_category(payload: AccountCategoryIn, db: Session = Depends(ge
 
 
 @router.get("/accounts/entries")
-def list_account_entries(start: date | None = None, end: date | None = None, entry_type: str | None = None, category: str | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    query = select(AccountEntry).where(AccountEntry.user_id == user.id)
-    if start: query = query.where(AccountEntry.entry_date >= start)
-    if end: query = query.where(AccountEntry.entry_date <= end)
-    if entry_type: query = query.where(AccountEntry.entry_type == entry_type)
-    if category: query = query.where(AccountEntry.category == category)
-    rows = db.scalars(query.order_by(desc(AccountEntry.entry_date), desc(AccountEntry.id)).limit(300)).all()
-    return ok([dump(row) for row in rows])
+def list_account_entries(start: date | None = None, end: date | None = None, entry_type: str | None = None, category: str | None = None, page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    conditions = [AccountEntry.user_id == user.id]
+    if start: conditions.append(AccountEntry.entry_date >= start)
+    if end: conditions.append(AccountEntry.entry_date <= end)
+    if entry_type: conditions.append(AccountEntry.entry_type == entry_type)
+    if category: conditions.append(AccountEntry.category == category)
+    total = db.scalar(select(func.count(AccountEntry.id)).where(*conditions)) or 0
+    rows = db.scalars(select(AccountEntry).where(*conditions).order_by(desc(AccountEntry.entry_date), desc(AccountEntry.id)).offset((page - 1) * page_size).limit(page_size)).all()
+    return ok({"items": [dump(row) for row in rows], "total": total, "page": page, "page_size": page_size})
 
 
 @router.post("/accounts/entries")

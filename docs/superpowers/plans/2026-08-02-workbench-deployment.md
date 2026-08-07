@@ -51,8 +51,8 @@
 
 - [ ] Validate the branch parameter and clone `https://github.com/yangjingquan/workbench.git`.
 - [ ] Copy the checked-out Compose files and server environment into `/opt/shop/workbench` without overwriting an existing secret file.
-- [ ] Verify `xp-mysql` health and run `backend/sql/init.sql` idempotently against `workbench`.
-- [ ] Run `backend/sql/init.sql` against database `workbench` using the server environment credentials.
+- [ ] Verify `xp-mysql` health and run `deploy/schema-only.sh` against `workbench`.
+- [ ] Confirm the deployment imports no local database volume, dump, or application data.
 - [ ] Run `docker compose --project-name workbench up -d --build workbench-api workbench-web`.
 - [ ] Verify `http://127.0.0.1:18082/health`, `http://127.0.0.1:18083/`, and Compose container status.
 

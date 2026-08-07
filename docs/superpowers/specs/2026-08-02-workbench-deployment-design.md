@@ -15,9 +15,10 @@ The existing `nexbyte-site` container and its `18081` binding remain unchanged. 
 
 - Production frontend builds use `VITE_API_BASE=http://wbapi.nexbyte.top`.
 - Backend uses a server-side environment file containing the MySQL URL, JWT secret, CORS origins, and application port.
-- `backend/sql/init.sql` initializes the database and baseline tables during deployment.
+- `backend/sql/init.sql` contains the deployment DDL for the database and baseline tables; it is applied through `deploy/schema-only.sh` and must not contain data import statements.
 - Backend startup also runs the existing SQLAlchemy schema compatibility migration, so upgrades add missing reminder columns without dropping data.
 - Database data remains in the existing `shop_shop-mysql-data` volume; deployment does not create or remove a second MySQL volume.
+- Jenkins never copies a local database volume or dump to the server. The schema-only script rejects data-mutating SQL before it reaches MySQL.
 
 ## Jenkins delivery flow
 
@@ -25,10 +26,9 @@ The Jenkins job named `workbench` runs on the server-mounted workspace:
 
 1. Checkout the repository.
 2. Build `workbench-api` and `workbench-web` images.
-3. Verify `xp-mysql` is healthy and run the idempotent schema script against its `workbench` database.
-4. Run the initialization SQL against the `workbench` database.
-5. Start/recreate API and web containers.
-6. Verify `http://127.0.0.1:18082/health` and `http://127.0.0.1:18083/`.
+3. Verify `xp-mysql` is healthy and run the schema-only script against its `workbench` database.
+4. Start/recreate API and web containers.
+5. Verify `http://127.0.0.1:18082/health` and `http://127.0.0.1:18083/`.
 
 The deployment uses Docker Compose and the persistent project directory `/opt/shop/workbench`, which is already mounted into the existing Jenkins container. Secrets are supplied through the server environment file and are not committed to the repository.
 

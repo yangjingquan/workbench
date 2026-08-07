@@ -444,7 +444,7 @@ def list_workspaces(db: Session = Depends(get_db), user: User = Depends(get_curr
     result = []
     for workspace in workspaces:
         item = dump(workspace)
-        item["projects"] = [dump(project) for project in db.scalars(select(Project).where(Project.user_id == user.id, Project.workspace_id == workspace.id, Project.archived.is_(False)).order_by(Project.updated_at.desc(), Project.id)).all()]
+        item["projects"] = [dump(project) for project in db.scalars(select(Project).where(Project.user_id == user.id, Project.workspace_id == workspace.id, Project.archived.is_(False)).order_by(Project.created_at.asc(), Project.id.asc())).all()]
         result.append(item)
     return ok(result)
 
@@ -476,7 +476,7 @@ def list_projects(workspace_id: int | None = None, include_archived: bool = Fals
     query = select(Project).where(Project.user_id == user.id)
     if not include_archived: query = query.where(Project.archived.is_(False))
     if workspace_id is not None: query = query.where(Project.workspace_id == workspace_id)
-    return ok([dump(row) for row in db.scalars(query.order_by(Project.updated_at.desc(), Project.id)).all()])
+    return ok([dump(row) for row in db.scalars(query.order_by(Project.created_at.asc(), Project.id.asc())).all()])
 
 
 @router.post("/projects")
@@ -606,6 +606,12 @@ def update_project(project_id: int, payload: ProjectIn, db: Session = Depends(ge
 @router.delete("/projects/{project_id}")
 def archive_project(project_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     row = _project_row(project_id, user, db); row.archived = True; row.status = "archived"; db.commit(); return ok(msg="项目已归档")
+
+
+@router.delete("/projects/{project_id}/permanent")
+def delete_project(project_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    row = _project_row(project_id, user, db)
+    db.delete(row); db.commit(); return ok(msg="项目已删除")
 
 
 @router.get("/work-records")

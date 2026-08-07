@@ -14,7 +14,9 @@ const api = read('../api/http.js')
 test('dashboard exposes live focus tasks and elapsed time', () => {
   assert.match(dashboard, /focus_tasks/)
   assert.match(dashboard, /formatDuration\(task\.elapsed_seconds\)/)
+  assert.match(dashboard, /parseTimerTimestamp/)
   assert.match(dashboard, /focusTimer = window\.setInterval/)
+  assert.match(dashboard, /}, 250\)/)
 })
 
 test('work records display hours as hours and minutes', () => {

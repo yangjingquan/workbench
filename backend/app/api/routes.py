@@ -215,6 +215,13 @@ def _workspace_for_user(workspace_id: int, user: User, db: Session) -> Workspace
     return workspace
 
 
+def _workspace_project_ids(workspace_id: int | None, user: User, db: Session):
+    if workspace_id is None:
+        return None
+    _workspace_for_user(workspace_id, user, db)
+    return select(Project.id).where(Project.user_id == user.id, Project.workspace_id == workspace_id, Project.archived.is_(False))
+
+
 def _project_row(project_id: int, user: User, db: Session) -> Project:
     project = db.scalar(select(Project).where(Project.id == project_id, Project.user_id == user.id))
     if not project:
@@ -602,12 +609,13 @@ def archive_project(project_id: int, db: Session = Depends(get_db), user: User =
 
 
 @router.get("/work-records")
-def list_records(start: date | None = None, end: date | None = None, keyword: str | None = None, project_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_records(start: date | None = None, end: date | None = None, keyword: str | None = None, project_id: int | None = None, workspace_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     query = select(WorkRecord).where(WorkRecord.user_id == user.id)
     if start: query = query.where(WorkRecord.work_date >= start)
     if end: query = query.where(WorkRecord.work_date <= end)
     if keyword: query = query.where(or_(WorkRecord.title.like(f"%{keyword}%"), WorkRecord.content.like(f"%{keyword}%")))
     if project_id is not None: query = query.where(WorkRecord.project_id == _project_for_user(project_id, user, db))
+    elif workspace_id is not None: query = query.where(WorkRecord.project_id.in_(_workspace_project_ids(workspace_id, user, db)))
     rows = db.scalars(query.order_by(desc(WorkRecord.work_date), desc(WorkRecord.id))).all()
     return ok([dump(row) for row in rows])
 
@@ -638,12 +646,13 @@ def delete_record(item_id: int, db: Session = Depends(get_db), user: User = Depe
 
 
 @router.get("/work-plans")
-def list_plans(month: str | None = None, project_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_plans(month: str | None = None, project_id: int | None = None, workspace_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     query = select(WorkPlan).where(WorkPlan.user_id == user.id)
     if month:
         prefix = f"{month}%"
         query = query.where(or_(func.date_format(WorkPlan.start_date, "%Y-%m").like(prefix), func.date_format(WorkPlan.end_date, "%Y-%m").like(prefix)))
     if project_id is not None: query = query.where(WorkPlan.project_id == _project_for_user(project_id, user, db))
+    elif workspace_id is not None: query = query.where(WorkPlan.project_id.in_(_workspace_project_ids(workspace_id, user, db)))
     return ok([dump(row) for row in db.scalars(query.order_by(WorkPlan.start_date)).all()])
 
 
@@ -729,6 +738,7 @@ def reminder_action(item_id: int, action: str = Query(..., pattern="^(ack|snooze
 
 def todo_dict(row: TodoTask):
     result = dump(row)
+    result["timer_started_at"] = _utc_iso(row.timer_started_at)
     result["subtasks"] = [dump(item) for item in row.subtasks]
     return result
 
@@ -794,11 +804,12 @@ def _ensure_todo_completion_record(task: TodoTask, user_id: int, db: Session) ->
 
 
 @router.get("/todos")
-def list_todos(include_archived: bool = False, keyword: str | None = None, project_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_todos(include_archived: bool = False, keyword: str | None = None, project_id: int | None = None, workspace_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     query = select(TodoTask).where(TodoTask.user_id == user.id)
     if not include_archived: query = query.where(TodoTask.archived.is_(False))
     if keyword: query = query.where(or_(TodoTask.title.like(f"%{keyword}%"), TodoTask.description.like(f"%{keyword}%"), TodoTask.notes.like(f"%{keyword}%")))
     if project_id is not None: query = query.where(TodoTask.project_id == _project_for_user(project_id, user, db))
+    elif workspace_id is not None: query = query.where(TodoTask.project_id.in_(_workspace_project_ids(workspace_id, user, db)))
     return ok([todo_dict(row) for row in db.scalars(query.order_by(TodoTask.position, desc(TodoTask.id))).all()])
 
 
@@ -936,9 +947,10 @@ def restore_todo(item_id: int, db: Session = Depends(get_db), user: User = Depen
 
 
 @router.get("/quick-links")
-def list_links(project_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_links(project_id: int | None = None, workspace_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     query = select(QuickLink).where(QuickLink.user_id == user.id)
     if project_id is not None: query = query.where(QuickLink.project_id == _project_for_user(project_id, user, db))
+    elif workspace_id is not None: query = query.where(QuickLink.project_id.in_(_workspace_project_ids(workspace_id, user, db)))
     return ok([dump(row) for row in db.scalars(query.order_by(QuickLink.position, QuickLink.id)).all()])
 
 
@@ -1090,10 +1102,11 @@ def account_summary(period: str = Query("month"), anchor: str | None = None, db:
 
 
 @router.get("/memos")
-def list_memos(keyword: str | None = None, project_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_memos(keyword: str | None = None, project_id: int | None = None, workspace_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     query = select(Memo).where(Memo.user_id == user.id)
     if keyword and keyword.strip(): query = query.where(Memo.title.like(f"%{keyword.strip()}%"))
     if project_id is not None: query = query.where(Memo.project_id == _project_for_user(project_id, user, db))
+    elif workspace_id is not None: query = query.where(Memo.project_id.in_(_workspace_project_ids(workspace_id, user, db)))
     rows = db.scalars(query.order_by(desc(Memo.created_at), desc(Memo.id))).all()
     return ok([dump(row) for row in rows])
 
@@ -1148,35 +1161,50 @@ def save_config(payload: ConfigIn, db: Session = Depends(get_db), user: User = D
 
 
 @router.get("/search")
-def global_search(keyword: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def global_search(keyword: str, project_id: int | None = None, workspace_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     like = f"%{keyword}%"
-    records = db.scalars(select(WorkRecord).where(WorkRecord.user_id == user.id, or_(WorkRecord.title.like(like), WorkRecord.content.like(like))).limit(10)).all()
-    plans = db.scalars(select(WorkPlan).where(WorkPlan.user_id == user.id, or_(WorkPlan.title.like(like), WorkPlan.description.like(like))).limit(10)).all()
-    todos = db.scalars(select(TodoTask).where(TodoTask.user_id == user.id, or_(TodoTask.title.like(like), TodoTask.description.like(like), TodoTask.notes.like(like))).limit(10)).all()
-    links = db.scalars(select(QuickLink).where(QuickLink.user_id == user.id, or_(QuickLink.title.like(like), QuickLink.url.like(like), QuickLink.description.like(like))).limit(10)).all()
-    memos = db.scalars(select(Memo).where(Memo.user_id == user.id, or_(Memo.title.like(like), Memo.content.like(like))).limit(10)).all()
+    project_scope = _project_for_user(project_id, user, db) if project_id is not None else None
+    workspace_scope = _workspace_project_ids(workspace_id, user, db) if project_id is None and workspace_id is not None else None
+    def scope(model):
+        conditions = [model.user_id == user.id]
+        if project_scope is not None: conditions.append(model.project_id == project_scope)
+        elif workspace_scope is not None: conditions.append(model.project_id.in_(workspace_scope))
+        return conditions
+    records = db.scalars(select(WorkRecord).where(*scope(WorkRecord), or_(WorkRecord.title.like(like), WorkRecord.content.like(like))).limit(10)).all()
+    plans = db.scalars(select(WorkPlan).where(*scope(WorkPlan), or_(WorkPlan.title.like(like), WorkPlan.description.like(like))).limit(10)).all()
+    todos = db.scalars(select(TodoTask).where(*scope(TodoTask), or_(TodoTask.title.like(like), TodoTask.description.like(like), TodoTask.notes.like(like))).limit(10)).all()
+    links = db.scalars(select(QuickLink).where(*scope(QuickLink), or_(QuickLink.title.like(like), QuickLink.url.like(like), QuickLink.description.like(like))).limit(10)).all()
+    memos = db.scalars(select(Memo).where(*scope(Memo), or_(Memo.title.like(like), Memo.content.like(like))).limit(10)).all()
     return ok({"records": [dump(x) for x in records], "plans": [dump(x) for x in plans], "todos": [todo_dict(x) for x in todos], "links": [dump(x) for x in links], "memos": [dump(x) for x in memos]})
 
 
 @router.get("/dashboard")
-def dashboard(month: str | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def dashboard(month: str | None = None, project_id: int | None = None, workspace_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     month = month or date.today().strftime("%Y-%m")
     month_start = date.fromisoformat(f"{month}-01")
     month_end = date(month_start.year + (month_start.month == 12), 1 if month_start.month == 12 else month_start.month + 1, 1) - timedelta(days=1)
-    hours = db.scalar(select(func.coalesce(func.sum(WorkRecord.hours), 0)).where(WorkRecord.user_id == user.id, WorkRecord.work_date.between(month_start, month_end))) or 0
-    total = db.scalar(select(func.count(TodoTask.id)).where(TodoTask.user_id == user.id, TodoTask.archived.is_(False))) or 0
-    done = db.scalar(select(func.count(TodoTask.id)).where(TodoTask.user_id == user.id, TodoTask.status == "done", TodoTask.archived.is_(False))) or 0
-    records = db.execute(select(WorkRecord.work_date, func.sum(WorkRecord.hours)).where(WorkRecord.user_id == user.id, WorkRecord.work_date.between(month_start, month_end)).group_by(WorkRecord.work_date).order_by(WorkRecord.work_date)).all()
+    project_scope = _project_for_user(project_id, user, db) if project_id is not None else None
+    workspace_scope = _workspace_project_ids(workspace_id, user, db) if project_id is None and workspace_id is not None else None
+    record_conditions = [WorkRecord.user_id == user.id, WorkRecord.work_date.between(month_start, month_end)]
+    todo_conditions = [TodoTask.user_id == user.id, TodoTask.archived.is_(False)]
+    if project_scope is not None:
+        record_conditions.append(WorkRecord.project_id == project_scope); todo_conditions.append(TodoTask.project_id == project_scope)
+    elif workspace_scope is not None:
+        record_conditions.append(WorkRecord.project_id.in_(workspace_scope)); todo_conditions.append(TodoTask.project_id.in_(workspace_scope))
+    hours = db.scalar(select(func.coalesce(func.sum(WorkRecord.hours), 0)).where(*record_conditions)) or 0
+    total = db.scalar(select(func.count(TodoTask.id)).where(*todo_conditions)) or 0
+    done = db.scalar(select(func.count(TodoTask.id)).where(*todo_conditions, TodoTask.status == "done")) or 0
+    records = db.execute(select(WorkRecord.work_date, func.sum(WorkRecord.hours)).where(*record_conditions).group_by(WorkRecord.work_date).order_by(WorkRecord.work_date)).all()
     tools = db.execute(select(ToolUsageLog.tool_name, func.count(ToolUsageLog.id)).where(ToolUsageLog.user_id == user.id).group_by(ToolUsageLog.tool_name).order_by(desc(func.count(ToolUsageLog.id)))).all()
     focus_tasks = []
-    active_tasks = db.scalars(select(TodoTask).where(TodoTask.user_id == user.id, TodoTask.archived.is_(False), TodoTask.timer_started_at.is_not(None)).order_by(TodoTask.timer_started_at)).all()
+    active_tasks = db.scalars(select(TodoTask).where(*todo_conditions, TodoTask.timer_started_at.is_not(None)).order_by(TodoTask.timer_started_at)).all()
     for task in active_tasks:
         focus_tasks.append({
             "id": task.id,
             "title": task.title,
             "status": task.status,
             "priority": task.priority,
-            "timer_started_at": task.timer_started_at,
+            "timer_started_at": _utc_iso(task.timer_started_at),
             "elapsed_seconds": task.elapsed_seconds or 0,
         })
     return ok({"cards": {"hours": round(float(hours), 1), "todo_total": total, "todo_done": done, "completion_rate": round(done / total * 100) if total else 0}, "focus_tasks": focus_tasks, "work_trend": [{"date": str(d), "hours": float(h)} for d, h in records], "tool_usage": [{"name": n, "count": c} for n, c in tools]})

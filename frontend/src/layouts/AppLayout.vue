@@ -30,7 +30,7 @@
           <el-dropdown trigger="click" @command="handleUserCommand"><div class="avatar-wrap"><el-avatar :size="34" :src="app.user?.avatar_url || ''">{{ (app.user?.display_name || '管')[0] }}</el-avatar><span class="online-dot" /></div><template #dropdown><el-dropdown-menu><el-dropdown-item command="profile">个人中心</el-dropdown-item><el-dropdown-item divided command="logout">退出登录</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
         </div>
       </header>
-      <section class="content-scroll"><RouterView /></section>
+      <section class="content-scroll"><RouterView :key="`${route.fullPath}:${app.currentWorkspaceId || 'all'}:${app.currentProjectId || 'all'}`" /></section>
     </main>
     <Transition name="mobile-nav">
       <div v-if="mobileNav.open" class="mobile-nav-layer" @keydown="handleMobileNavKeydown">
@@ -102,7 +102,7 @@ function handleMobileNavKeydown(event) {
 watch(() => route.fullPath, closeMobileMenu)
 const mainNav = [{ path: '/dashboard', label: '总览看板', icon: Odometer }, { path: '/projects', label: '项目管理', icon: FolderOpened }, { path: '/records', label: '工作记录', icon: List }, { path: '/plans', label: '工作计划', icon: Calendar }, { path: '/reminders', label: '事件提醒', icon: Bell }, { path: '/todos', label: 'Todo 看板', icon: List }, { path: '/links', label: '快捷导航', icon: Link }]
 const groupNames = { records: '工作记录', plans: '计划', todos: '待办', links: '链接', memos: '备忘录' }
-async function doSearch() { if (!keyword.value.trim()) return; results.value = (await api.search(keyword.value)).data }
+async function doSearch() { if (!keyword.value.trim()) return; results.value = (await api.search(keyword.value, { workspace_id: app.currentWorkspaceId || undefined, project_id: app.currentProjectId || undefined })).data }
 function goToSearchResult(type) { const target = { records: '/records', plans: '/plans', todos: '/todos', links: '/links', memos: '/memos' }[type]; if (!target) return; searchOpen.value = false; router.push(target) }
 async function handleUserCommand(command) { if (command === 'profile') return router.push('/profile'); app.clearSession(); await router.replace('/login'); ElMessage.success('已退出登录') }
 onMounted(() => { app.loadProjectContext().catch(() => {}) })

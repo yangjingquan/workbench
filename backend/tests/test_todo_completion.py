@@ -1,7 +1,7 @@
 from datetime import datetime
 from unittest.mock import Mock
 
-from app.api.routes import _ensure_todo_completion_record
+from app.api.routes import _ensure_todo_completion_record, todo_dict
 from app.models import TodoTask, WorkRecord
 
 
@@ -38,3 +38,11 @@ def test_completed_todo_does_not_duplicate_an_existing_record():
     _ensure_todo_completion_record(task, 7, db)
 
     db.add.assert_not_called()
+
+
+def test_active_timer_is_serialized_as_utc_for_browser_elapsed_time():
+    task = TodoTask(id=12, title="正在计时", timer_started_at=datetime(2026, 8, 7, 16, 0, 0))
+
+    payload = todo_dict(task)
+
+    assert payload["timer_started_at"] == "2026-08-07T16:00:00Z"

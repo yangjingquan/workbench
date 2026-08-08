@@ -4365,3 +4365,9 @@ html.dark .plans-toolbar { background: rgba(24, 27, 41, .82); }
     text-align: right;
   }
 }
+
+/* Keep the login fields aligned despite labels having different text widths. */
+.login-card .el-form-item__label {
+  flex: 0 0 48px;
+  width: 48px;
+}

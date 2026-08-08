@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">小胖 Mac 客户端图标 · 深色青绿</title>
+  <desc id="desc">深海蓝底色搭配青绿色工作台徽章，中心为小胖字样。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#102b46"/>
+      <stop offset=".56" stop-color="#123e52"/>
+      <stop offset="1" stop-color="#0b6b70"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#55e0b1"/>
+      <stop offset="1" stop-color="#159fd0"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#061c2d" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <rect x="56" y="56" width="912" height="912" rx="224" fill="url(#bg)" filter="url(#shadow)"/>
+  <circle cx="512" cy="512" r="294" fill="none" stroke="#80f2d0" stroke-width="3" stroke-dasharray="12 20" opacity=".65"/>
+  <rect x="222" y="222" width="580" height="580" rx="170" fill="url(#badge)"/>
+  <path d="M222 392c110-114 328-178 580-56V392c-212-56-416-30-580 72Z" fill="#fff" opacity=".16"/>
+  <path d="M382 404h260M382 512h260M382 620h164" stroke="#fff" stroke-width="20" stroke-linecap="round" opacity=".82"/>
+  <text x="512" y="574" text-anchor="middle" fill="#0e4a59" font-family="PingFang SC,Hiragino Sans GB,Microsoft YaHei,sans-serif" font-size="200" font-weight="850" letter-spacing="16">小胖</text>
+  <circle cx="746" cy="290" r="22" fill="#b8ffe8"/>
+  <circle cx="790" cy="334" r="10" fill="#b8ffe8" opacity=".65"/>
+</svg>

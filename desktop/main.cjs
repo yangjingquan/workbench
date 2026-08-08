@@ -80,7 +80,7 @@ async function createWindow() {
     minWidth: 1080,
     minHeight: 720,
     backgroundColor: '#f5f7fb',
-    title: 'Workbench',
+    title: '杨小胖的工作台',
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.cjs') },
   })
   configureExternalNavigation(mainWindow)

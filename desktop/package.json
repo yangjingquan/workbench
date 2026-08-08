@@ -1,6 +1,6 @@
 {
   "name": "dev-workbench-desktop",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Workbench macOS desktop client",
   "main": "main.cjs",
@@ -27,9 +27,10 @@
       { "from": "../backend/sql", "to": "backend/sql" }
     ],
     "mac": {
+      "icon": "assets/icons/xiaopang-icon-warm-coral.icns",
       "category": "public.app-category.productivity",
       "target": ["dmg", "zip"],
-      "artifactName": "Workbench-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     }
   }
 }

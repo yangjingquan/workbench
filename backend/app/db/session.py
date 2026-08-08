@@ -30,7 +30,6 @@ def ensure_schema():
         "work_plan": "INT NULL",
         "todo_task": "INT NULL",
         "quick_link": "INT NULL",
-        "memo": "INT NULL",
     }
     columns = {item["name"] for item in inspect(engine).get_columns("event_reminder")}
     additions = {

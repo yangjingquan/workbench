@@ -4324,13 +4324,12 @@ html.dark .plans-toolbar { background: rgba(24, 27, 41, .82); }
   .account-trend-list { max-height: none; }
   .account-trend-item { grid-template-columns: 1fr; gap: 5px; padding: 9px 0; }
   .mobile-accounting-card { border-radius: 12px; }
-  .account-pagination { justify-content: flex-end; overflow: hidden; padding-inline: 0; }
-  .account-pagination .el-pagination { width: 100%; justify-content: flex-end; flex-wrap: nowrap; }
+  .account-pagination { justify-content: center; overflow: hidden; padding-inline: 0; }
+  .account-pagination .el-pagination { width: 100%; justify-content: center; flex-wrap: nowrap; }
   .account-pagination .el-pagination__total { display: none; }
-  .account-pagination .el-pagination__sizes { flex: 0 0 100px; margin: 0 2px 0 0; }
-  .account-pagination .el-pagination__sizes .el-select { width: 100px !important; }
-  .account-pagination .el-pagination__jump { margin-left: 2px; white-space: nowrap; }
-  .account-pagination .el-pagination__jump .el-input { width: 42px !important; }
+  .account-pagination .el-pagination__sizes { flex: 0 0 96px; width: 96px; margin: 0 4px 0 0; }
+  .account-pagination .el-pagination__sizes .el-select { width: 96px !important; }
+  .account-pagination .el-pagination__jump { display: none; }
 
   /* Keep the category type and count in one right-hand column so the
      "笔数" metric sits directly beneath "支出/进账". */
@@ -4363,6 +4362,37 @@ html.dark .plans-toolbar { background: rgba(24, 27, 41, .82); }
     margin-top: 0;
     align-items: flex-end;
     text-align: right;
+  }
+}
+
+/* Electron/WebKit can otherwise let the account type buttons wrap vertically. */
+.accounting-page .account-entry-type-toggle {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  width: max-content;
+}
+
+.accounting-page .account-entry-type-toggle .el-radio-button {
+  display: block;
+  flex: 0 0 74px;
+  width: 74px;
+}
+
+.accounting-page .account-entry-type-toggle .el-radio-button__inner {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .accounting-page .account-entry-type-toggle { width: 100%; }
+  .accounting-page .account-entry-type-toggle .el-radio-button {
+    flex: 1 1 0;
+    width: auto;
   }
 }
 

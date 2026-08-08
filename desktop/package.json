@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "com.workbench.personal",
-    "productName": "Workbench",
+    "productName": "杨小胖的工作台",
     "asar": true,
     "directories": { "output": "dist" },
     "files": ["main.cjs", "preload.cjs", "renderer/**/*"],

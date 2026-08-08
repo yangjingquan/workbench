@@ -181,7 +181,6 @@ class Memo(TimestampMixin, Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), index=True)
     title: Mapped[str] = mapped_column(String(200))
     content: Mapped[str] = mapped_column(Text)
-    project_id: Mapped[int | None] = mapped_column(ForeignKey("project.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
 class ProjectMilestone(TimestampMixin, Base):

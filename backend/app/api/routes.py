@@ -180,7 +180,7 @@ def _ensure_user_project_setup(db: Session, user_id: int) -> None:
     if changed:
         db.commit()
 
-    legacy_models = (WorkRecord, WorkPlan, TodoTask, QuickLink, Memo)
+    legacy_models = (WorkRecord, WorkPlan, TodoTask, QuickLink)
     has_legacy = any(db.scalar(select(func.count(model.id)).where(model.user_id == user_id, model.project_id.is_(None))) for model in legacy_models)
     if not has_legacy:
         return
@@ -332,7 +332,6 @@ class AccountEntryIn(BaseModel):
 class MemoIn(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     content: str = Field(min_length=1)
-    project_id: int | None = None
 
 
 class WorkspaceIn(BaseModel):
@@ -1108,11 +1107,9 @@ def account_summary(period: str = Query("month"), anchor: str | None = None, db:
 
 
 @router.get("/memos")
-def list_memos(keyword: str | None = None, project_id: int | None = None, workspace_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def list_memos(keyword: str | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     query = select(Memo).where(Memo.user_id == user.id)
     if keyword and keyword.strip(): query = query.where(Memo.title.like(f"%{keyword.strip()}%"))
-    if project_id is not None: query = query.where(Memo.project_id == _project_for_user(project_id, user, db))
-    elif workspace_id is not None: query = query.where(Memo.project_id.in_(_workspace_project_ids(workspace_id, user, db)))
     rows = db.scalars(query.order_by(desc(Memo.created_at), desc(Memo.id))).all()
     return ok([dump(row) for row in rows])
 
@@ -1121,9 +1118,7 @@ def list_memos(keyword: str | None = None, project_id: int | None = None, worksp
 def create_memo(payload: MemoIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     title = payload.title.strip(); content = payload.content.strip()
     if not title or not content: raise HTTPException(400, "标题和内容都不能为空")
-    payload.project_id = _project_for_user(payload.project_id, user, db)
     row = Memo(user_id=user.id, title=title, content=content)
-    row.project_id = payload.project_id
     db.add(row); db.commit(); db.refresh(row)
     return ok(dump(row), "备忘录已保存")
 
@@ -1134,8 +1129,7 @@ def update_memo(item_id: int, payload: MemoIn, db: Session = Depends(get_db), us
     if not row: raise HTTPException(404, "备忘录不存在")
     title = payload.title.strip(); content = payload.content.strip()
     if not title or not content: raise HTTPException(400, "标题和内容都不能为空")
-    payload.project_id = _project_for_user(payload.project_id, user, db)
-    row.title = title; row.content = content; row.project_id = payload.project_id; db.commit(); db.refresh(row)
+    row.title = title; row.content = content; db.commit(); db.refresh(row)
     return ok(dump(row), "备忘录已更新")
 
 
@@ -1180,7 +1174,7 @@ def global_search(keyword: str, project_id: int | None = None, workspace_id: int
     plans = db.scalars(select(WorkPlan).where(*scope(WorkPlan), or_(WorkPlan.title.like(like), WorkPlan.description.like(like))).limit(10)).all()
     todos = db.scalars(select(TodoTask).where(*scope(TodoTask), or_(TodoTask.title.like(like), TodoTask.description.like(like), TodoTask.notes.like(like))).limit(10)).all()
     links = db.scalars(select(QuickLink).where(QuickLink.user_id == user.id, or_(QuickLink.title.like(like), QuickLink.url.like(like), QuickLink.description.like(like))).limit(10)).all()
-    memos = db.scalars(select(Memo).where(*scope(Memo), or_(Memo.title.like(like), Memo.content.like(like))).limit(10)).all()
+    memos = db.scalars(select(Memo).where(Memo.user_id == user.id, or_(Memo.title.like(like), Memo.content.like(like))).limit(10)).all()
     return ok({"records": [dump(x) for x in records], "plans": [dump(x) for x in plans], "todos": [todo_dict(x) for x in todos], "links": [dump(x) for x in links], "memos": [dump(x) for x in memos]})
 
 

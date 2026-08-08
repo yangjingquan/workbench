@@ -12,3 +12,4 @@ desktop/renderer/
 desktop/dist/
 desktop/backend-resources/*
 !desktop/backend-resources/.gitkeep
+.superdesign/tmp/

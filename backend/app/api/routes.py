@@ -656,8 +656,13 @@ def list_plans(month: str | None = None, project_id: int | None = None, workspac
     if month:
         prefix = f"{month}%"
         query = query.where(or_(func.date_format(WorkPlan.start_date, "%Y-%m").like(prefix), func.date_format(WorkPlan.end_date, "%Y-%m").like(prefix)))
-    if project_id is not None: query = query.where(WorkPlan.project_id == _project_for_user(project_id, user, db))
-    elif workspace_id is not None: query = query.where(WorkPlan.project_id.in_(_workspace_project_ids(workspace_id, user, db)))
+    if project_id is not None:
+        query = query.where(WorkPlan.project_id == _project_for_user(project_id, user, db))
+    elif workspace_id is not None:
+        # Plans can be created without a project. Keep those personal plans visible
+        # in the selected workspace instead of hiding them after a page refresh.
+        workspace_projects = _workspace_project_ids(workspace_id, user, db)
+        query = query.where(or_(WorkPlan.project_id.in_(workspace_projects), WorkPlan.project_id.is_(None)))
     return ok([dump(row) for row in db.scalars(query.order_by(WorkPlan.start_date)).all()])
 
 

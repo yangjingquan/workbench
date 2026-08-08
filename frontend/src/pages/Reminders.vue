@@ -1,16 +1,16 @@
 <template>
-  <div class="page-heading">
+  <div class="page-heading reminder-page-heading">
     <div><h1>事件提醒</h1><p>支持单次、每日、每周多天和每月多日周期提醒；通知右上角 X 表示已收到本周期提醒。</p></div>
-    <div class="page-actions"><el-button @click="enableNotifications">开启桌面通知</el-button><el-button type="primary" @click="openCreate">+ 新建提醒</el-button></div>
+    <div class="page-actions reminder-page-actions"><el-button class="reminder-notification-action" @click="enableNotifications">开启桌面通知</el-button><el-button class="reminder-create-action" type="primary" @click="openCreate">+ 新建提醒</el-button></div>
   </div>
 
   <div class="desktop-table table-card">
-    <el-table :data="rows" stripe>
+    <el-table class="reminder-table" :data="rows" stripe>
       <el-table-column prop="title" label="提醒事项" min-width="190" />
       <el-table-column label="规则" min-width="280"><template #default="scope"><b>{{ scheduleText(scope.row) }}</b><div v-if="scope.row.content" class="muted-text"><a v-if="isUrl(scope.row.content)" class="reminder-link" :href="normalizeUrl(scope.row.content)" target="_blank" rel="noopener noreferrer" @click.stop>{{ scope.row.content }}</a><span v-else>{{ scope.row.content }}</span></div><div v-else class="muted-text">无备注</div></template></el-table-column>
       <el-table-column label="下一次执行" width="185"><template #default="scope">{{ scope.row.status === 'active' ? (formatLocalDateTime(scope.row.next_trigger_at) || '已完成') : '—' }}</template></el-table-column>
       <el-table-column label="状态" width="100"><template #default="scope"><span :class="['status-tag', scope.row.status === 'closed' ? 'muted-status' : '']">{{ statusLabel(scope.row) }}</span></template></el-table-column>
-      <el-table-column label="操作" width="245" fixed="right"><template #default="scope"><el-button link type="primary" @click="openEdit(scope.row)">编辑</el-button><el-button v-if="scope.row.status === 'active'" link type="warning" @click="action(scope.row.id, 'close')">关闭</el-button><el-button v-else link type="success" @click="action(scope.row.id, 'activate')">启用</el-button><el-button link type="danger" @click="action(scope.row.id, 'delete')">删除</el-button></template></el-table-column>
+      <el-table-column label="操作" width="170" fixed="right" header-cell-class-name="reminder-actions-header" class-name="reminder-actions-cell"><template #default="scope"><el-tooltip content="编辑" placement="top"><el-button class="reminder-action-button reminder-action-edit" link type="primary" aria-label="编辑" @click="openEdit(scope.row)"><el-icon><Edit /></el-icon></el-button></el-tooltip><el-tooltip v-if="scope.row.status === 'active'" content="关闭" placement="top"><el-button class="reminder-action-button reminder-action-close" link type="warning" aria-label="关闭" @click="action(scope.row.id, 'close')"><el-icon><Close /></el-icon></el-button></el-tooltip><el-tooltip v-else content="启用" placement="top"><el-button class="reminder-action-button reminder-action-enable" link type="success" aria-label="启用" @click="action(scope.row.id, 'activate')"><el-icon><CircleCheck /></el-icon></el-button></el-tooltip><el-tooltip content="删除" placement="top"><el-button class="reminder-action-button reminder-action-delete" link type="danger" aria-label="删除" @click="action(scope.row.id, 'delete')"><el-icon><Delete /></el-icon></el-button></el-tooltip></template></el-table-column>
     </el-table>
     <el-empty v-if="!rows.length" description="还没有事件提醒" />
   </div>
@@ -20,29 +20,30 @@
       <div class="mobile-card-header"><h3>{{ row.title }}</h3><span :class="['status-tag', row.status === 'closed' ? 'muted-status' : '']">{{ statusLabel(row) }}</span></div>
       <b class="mobile-card-rule">{{ scheduleText(row) }}</b>
       <p v-if="row.content" class="mobile-card-description"><a v-if="isUrl(row.content)" class="reminder-link" :href="normalizeUrl(row.content)" target="_blank" rel="noopener noreferrer">{{ row.content }}</a><span v-else>{{ row.content }}</span></p>
-      <div class="mobile-card-actions"><el-button link type="primary" @click="openEdit(row)">编辑</el-button><el-button v-if="row.status === 'active'" link type="warning" @click="action(row.id, 'close')">关闭</el-button><el-button v-else link type="success" @click="action(row.id, 'activate')">启用</el-button><el-button link type="danger" @click="action(row.id, 'delete')">删除</el-button></div>
+      <div class="mobile-card-actions"><el-tooltip content="编辑" placement="top"><el-button class="reminder-action-button reminder-action-edit" link type="primary" aria-label="编辑" @click="openEdit(row)"><el-icon><Edit /></el-icon></el-button></el-tooltip><el-tooltip v-if="row.status === 'active'" content="关闭" placement="top"><el-button class="reminder-action-button reminder-action-close" link type="warning" aria-label="关闭" @click="action(row.id, 'close')"><el-icon><Close /></el-icon></el-button></el-tooltip><el-tooltip v-else content="启用" placement="top"><el-button class="reminder-action-button reminder-action-enable" link type="success" aria-label="启用" @click="action(row.id, 'activate')"><el-icon><CircleCheck /></el-icon></el-button></el-tooltip><el-tooltip content="删除" placement="top"><el-button class="reminder-action-button reminder-action-delete" link type="danger" aria-label="删除" @click="action(row.id, 'delete')"><el-icon><Delete /></el-icon></el-button></el-tooltip></div>
     </article>
     <el-empty v-if="!rows.length" description="还没有事件提醒" />
   </div>
 
-  <el-dialog v-model="dialog" :title="editing ? '编辑事件提醒' : '新建事件提醒'" width="620px">
+  <el-dialog v-model="dialog" class="reminder-dialog" :title="editing ? '编辑事件提醒' : '新建事件提醒'" width="620px">
     <el-form :model="form" label-width="82px">
       <el-form-item label="提醒事项"><el-input v-model="form.title" placeholder="例如：每日复盘、周会、月度账单" /></el-form-item>
       <el-form-item label="备注"><el-input v-model="form.content" placeholder="可选" /></el-form-item>
-      <el-form-item label="执行周期"><el-radio-group v-model="form.schedule_type"><el-radio-button label="once">固定日期</el-radio-button><el-radio-button label="daily">每天</el-radio-button><el-radio-button label="weekly">每周</el-radio-button><el-radio-button label="monthly">每月</el-radio-button></el-radio-group></el-form-item>
+      <el-form-item label="执行周期"><el-radio-group v-model="form.schedule_type" class="reminder-schedule-type"><el-radio-button label="once">固定日期</el-radio-button><el-radio-button label="daily">每天</el-radio-button><el-radio-button label="weekly">每周</el-radio-button><el-radio-button label="monthly">每月</el-radio-button></el-radio-group></el-form-item>
       <el-form-item v-if="form.schedule_type === 'once'" label="执行时间"><el-date-picker v-model="form.remind_at" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" popper-class="reminder-picker-popper" style="width:100%" /></el-form-item>
       <el-form-item v-else label="执行时间"><el-time-picker v-model="form.time_of_day" value-format="HH:mm:ss" format="HH:mm" popper-class="reminder-picker-popper" style="width:100%" /></el-form-item>
       <el-form-item v-if="form.schedule_type === 'daily' || form.schedule_type === 'weekly'" :label="form.schedule_type === 'daily' ? '指定星期' : '每周日期'"><el-checkbox-group v-model="form.weekdays" class="weekday-options"><el-checkbox v-for="day in weekdayOptions" :key="day.value" :label="day.value" border>{{ day.label }}</el-checkbox></el-checkbox-group><div v-if="form.schedule_type === 'daily'" class="muted-text">不选择表示每天；选择后仅在指定星期提醒。</div></el-form-item>
       <el-form-item v-if="form.schedule_type === 'monthly'" label="每月日期"><el-select v-model="form.month_days" multiple filterable collapse-tags placeholder="选择日期，可多选" style="width:100%"><el-option v-for="day in 31" :key="day" :label="`${day} 日`" :value="day" /></el-select></el-form-item>
       <div class="muted-text schedule-help">示例：每天 00:05；每周选择周三、周五并设为 13:00；每月选择 1、3 日并设为 14:09。</div>
     </el-form>
-    <template #footer><el-button @click="dialog=false">取消</el-button><el-button type="primary" @click="save">保存提醒</el-button></template>
+    <template #footer><div class="reminder-dialog-actions"><el-button @click="dialog=false">取消</el-button><el-button type="primary" @click="save">保存提醒</el-button></div></template>
   </el-dialog>
 </template>
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { CircleCheck, Close, Delete, Edit } from '@element-plus/icons-vue'
 import { api } from '../api/http'
 import { browserTimezone, formatLocalDateTime, toUtcIso } from '../utils/reminderTime'
 

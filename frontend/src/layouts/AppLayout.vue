@@ -1,18 +1,19 @@
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'todo-shell': route.path === '/todos' }">
     <aside class="sidebar" :class="{ collapsed: app.collapsed }">
       <div class="brand"><div class="brand-mark">⌘</div><div v-if="!app.collapsed" class="brand-copy"><b>Workbench</b><span>小胖的工作台</span></div></div>
       <nav class="nav-list">
         <div class="nav-section" v-if="!app.collapsed">WORKSPACE</div>
-        <RouterLink v-for="item in mainNav" :key="item.path" :to="item.path" class="nav-item"><el-icon><component :is="item.icon" /></el-icon><span v-if="!app.collapsed">{{ item.label }}</span></RouterLink>
+        <RouterLink v-for="item in mainNav" :key="item.path" :to="item.path" class="nav-item" :title="app.collapsed ? item.label : undefined"><el-icon><component :is="item.icon" /></el-icon><span v-if="!app.collapsed">{{ item.label }}</span></RouterLink>
         <div class="nav-section" v-if="!app.collapsed">TOOLS</div>
-        <RouterLink to="/toolkit" class="nav-item"><el-icon><Tools /></el-icon><span v-if="!app.collapsed">开发工具箱</span><span v-if="!app.collapsed" class="nav-badge">4</span></RouterLink>
-        <RouterLink to="/accounting" class="nav-item"><el-icon><Wallet /></el-icon><span v-if="!app.collapsed">记账存钱</span></RouterLink>
-        <RouterLink to="/memos" class="nav-item"><el-icon><Memo /></el-icon><span v-if="!app.collapsed">备忘录</span></RouterLink>
+        <RouterLink to="/toolkit" class="nav-item" :title="app.collapsed ? '开发工具箱' : undefined"><el-icon><Tools /></el-icon><span v-if="!app.collapsed">开发工具箱</span><span v-if="!app.collapsed" class="nav-badge">4</span></RouterLink>
+        <RouterLink to="/accounting" class="nav-item" :title="app.collapsed ? '记账存钱' : undefined"><el-icon><Wallet /></el-icon><span v-if="!app.collapsed">记账存钱</span></RouterLink>
+        <RouterLink to="/memos" class="nav-item" :title="app.collapsed ? '备忘录' : undefined"><el-icon><Memo /></el-icon><span v-if="!app.collapsed">备忘录</span></RouterLink>
       </nav>
       <div class="sidebar-bottom">
-        <RouterLink to="/settings" class="nav-item"><el-icon><Setting /></el-icon><span v-if="!app.collapsed">系统设置</span></RouterLink>
-        <button class="collapse-btn" @click="app.saveCollapsed(!app.collapsed)"><el-icon><DArrowLeft v-if="!app.collapsed" /><DArrowRight v-else /></el-icon><span v-if="!app.collapsed">收起侧栏</span></button>
+        <button class="nav-item nav-logout" type="button" :title="app.collapsed ? '退出登录' : undefined" @click="handleUserCommand('logout')"><el-icon><SwitchButton /></el-icon><span v-if="!app.collapsed">退出登录</span></button>
+        <RouterLink to="/settings" class="nav-item" :title="app.collapsed ? '系统设置' : undefined"><el-icon><Setting /></el-icon><span v-if="!app.collapsed">系统设置</span></RouterLink>
+        <button class="collapse-btn" type="button" :aria-label="app.collapsed ? '展开侧栏' : '收起侧栏'" @click="app.saveCollapsed(!app.collapsed)"><el-icon><DArrowLeft v-if="!app.collapsed" /><DArrowRight v-else /></el-icon><span v-if="!app.collapsed">收起侧栏</span></button>
       </div>
     </aside>
     <main class="main-area">
@@ -30,6 +31,30 @@
           <el-dropdown trigger="click" @command="handleUserCommand"><div class="avatar-wrap"><el-avatar :size="34" :src="app.user?.avatar_url || ''">{{ (app.user?.display_name || '管')[0] }}</el-avatar><span class="online-dot" /></div><template #dropdown><el-dropdown-menu><el-dropdown-item command="profile">个人中心</el-dropdown-item><el-dropdown-item divided command="logout">退出登录</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
         </div>
       </header>
+      <div class="mobile-context-switcher" aria-label="切换工作区和项目">
+        <el-select
+          class="mobile-context-select"
+          :model-value="app.currentWorkspaceId"
+          placeholder="工作区"
+          @change="app.selectWorkspace"
+        >
+          <el-option v-for="workspace in app.workspaces" :key="workspace.id" :label="workspace.name" :value="workspace.id" />
+        </el-select>
+        <el-select
+          class="mobile-context-select"
+          :model-value="app.currentProjectId"
+          placeholder="全部项目"
+          clearable
+          @change="app.selectProject"
+        >
+          <el-option
+            v-for="project in app.projects.filter(item => !app.currentWorkspaceId || item.workspace_id === app.currentWorkspaceId)"
+            :key="project.id"
+            :label="project.name"
+            :value="project.id"
+          />
+        </el-select>
+      </div>
       <section class="content-scroll"><RouterView :key="`${route.fullPath}:${app.currentWorkspaceId || 'all'}:${app.currentProjectId || 'all'}`" /></section>
     </main>
     <Transition name="mobile-nav">
@@ -41,11 +66,14 @@
             <button ref="mobileNavClose" class="mobile-nav-close" type="button" aria-label="关闭移动端导航" @click="closeMobileMenu"><el-icon><Close /></el-icon></button>
           </div>
           <nav class="mobile-nav-list">
+            <div class="nav-section">WORKSPACE</div>
             <RouterLink v-for="item in mainNav" :key="item.path" :to="item.path" class="nav-item" @click="closeMobileMenu"><el-icon><component :is="item.icon" /></el-icon><span>{{ item.label }}</span></RouterLink>
+            <div class="nav-section">TOOLS</div>
             <RouterLink to="/toolkit" class="nav-item" @click="closeMobileMenu"><el-icon><Tools /></el-icon><span>开发工具箱</span><span class="nav-badge">4</span></RouterLink>
             <RouterLink to="/accounting" class="nav-item" @click="closeMobileMenu"><el-icon><Wallet /></el-icon><span>记账存钱</span></RouterLink>
             <RouterLink to="/memos" class="nav-item" @click="closeMobileMenu"><el-icon><Memo /></el-icon><span>备忘录</span></RouterLink>
             <RouterLink to="/settings" class="nav-item" @click="closeMobileMenu"><el-icon><Setting /></el-icon><span>系统设置</span></RouterLink>
+            <button class="nav-item nav-logout" type="button" @click="closeMobileMenu(); handleUserCommand('logout')"><el-icon><SwitchButton /></el-icon><span>退出登录</span></button>
           </nav>
         </aside>
       </div>
@@ -63,7 +91,7 @@ import { useAppStore } from '../stores'
 import { api } from '../api/http'
 import ReminderPoll from '../components/ReminderPoll.vue'
 import { createMobileNavState, toggleMobileNav, closeMobileNav } from './mobileNav'
-import { Odometer, Calendar, Bell, List, Link, FolderOpened, Tools, Wallet, Memo, Setting, Search, Moon, Sunny, DArrowLeft, DArrowRight, Menu, Close } from '@element-plus/icons-vue'
+import { Odometer, Calendar, Bell, List, Link, FolderOpened, Tools, Wallet, Memo, Setting, SwitchButton, Search, Moon, Sunny, DArrowLeft, DArrowRight, Menu, Close } from '@element-plus/icons-vue'
 const app = useAppStore(); const route = useRoute(); const router = useRouter(); const searchOpen = ref(false); const keyword = ref(''); const results = ref(null)
 const mobileNav = reactive(createMobileNavState())
 const mobileMenuTrigger = ref(null)

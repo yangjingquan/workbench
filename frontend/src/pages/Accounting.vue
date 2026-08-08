@@ -1,4 +1,5 @@
 <template>
+  <div class="accounting-page">
   <div class="page-heading">
     <div><h1>记账存钱</h1><p>记录每一笔收入与支出，让钱流向更清晰。</p></div>
     <div class="page-actions"><el-button @click="categoryDialog = true">管理分类</el-button></div>
@@ -10,13 +11,13 @@
       <el-form label-position="top" @submit.prevent="saveEntry">
         <div class="two-col">
           <el-form-item label="账目类型">
-            <el-radio-group v-model="form.entry_type" @change="syncCategory">
+            <el-radio-group v-model="form.entry_type" class="account-entry-type-toggle" @change="syncCategory">
               <el-radio-button label="expense">支出</el-radio-button>
               <el-radio-button label="income">进账</el-radio-button>
             </el-radio-group>
           </el-form-item>
           <el-form-item label="金额">
-            <el-input-number v-model="form.amount" :min="0.01" :precision="2" :step="10" controls-position="right" style="width:100%" />
+            <el-input-number v-model="form.amount" class="account-amount-input" :min="0.01" :precision="2" :step="10" controls-position="right" style="width:100%" />
           </el-form-item>
         </div>
         <div class="two-col">
@@ -37,7 +38,7 @@
     <div class="panel account-summary-panel">
       <div class="panel-header account-summary-header">
         <div><div class="panel-title">收支统计</div><div class="panel-subtitle">按日、月、年查看账目变化</div></div>
-        <el-radio-group v-model="statPeriod" size="small">
+        <el-radio-group v-model="statPeriod" class="account-period-toggle" size="small">
           <el-radio-button label="day">日</el-radio-button><el-radio-button label="month">月</el-radio-button><el-radio-button label="year">年</el-radio-button>
         </el-radio-group>
       </div>
@@ -84,7 +85,7 @@
       <el-table-column prop="category" label="分类" width="150" />
       <el-table-column prop="note" label="备注" min-width="180" show-overflow-tooltip />
       <el-table-column label="金额" width="150"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(scope.row.amount) }}</span></template></el-table-column>
-      <el-table-column label="操作" width="140"><template #default="scope"><el-button link type="primary" @click="startEditEntry(scope.row)">编辑</el-button><el-button link type="danger" @click="removeEntry(scope.row.id)">删除</el-button></template></el-table-column>
+      <el-table-column label="操作" width="110"><template #default="scope"><div class="account-row-actions"><el-button class="account-icon-button account-icon-button-edit" link type="primary" :title="`编辑 ${scope.row.category} 账目`" :aria-label="`编辑 ${scope.row.category} 账目`" @click="startEditEntry(scope.row)"><el-icon><EditPen /></el-icon></el-button><el-button class="account-icon-button account-icon-button-delete" link type="danger" :title="`删除 ${scope.row.category} 账目`" :aria-label="`删除 ${scope.row.category} 账目`" @click="removeEntry(scope.row.id)"><el-icon><Delete /></el-icon></el-button></div></template></el-table-column>
       <template #empty><el-empty description="当前期间暂无账目" /></template>
     </el-table></div>
     <div class="mobile-accounting-list">
@@ -92,7 +93,7 @@
         <div class="mobile-accounting-card-header"><span>{{ item.entry_date }}</span><span :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '进账' : '支出' }}</span></div>
         <div class="mobile-entry-category"><span>分类</span><b>{{ item.category }}</b></div>
         <p v-if="item.note" class="mobile-entry-note">{{ item.note }}</p>
-        <div class="mobile-entry-footer"><b :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(item.amount) }}</b><span><el-button link type="primary" @click="startEditEntry(item)">编辑</el-button><el-button link type="danger" @click="removeEntry(item.id)">删除</el-button></span></div>
+        <div class="mobile-entry-footer"><b :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(item.amount) }}</b><span class="account-row-actions"><el-button class="account-icon-button account-icon-button-edit" link type="primary" title="编辑账目" aria-label="编辑账目" @click="startEditEntry(item)"><el-icon><EditPen /></el-icon></el-button><el-button class="account-icon-button account-icon-button-delete" link type="danger" title="删除账目" aria-label="删除账目" @click="removeEntry(item.id)"><el-icon><Delete /></el-icon></el-button></span></div>
       </article>
       <el-empty v-if="!entries.length" description="当前期间暂无账目" />
     </div>
@@ -107,11 +108,13 @@
     </div>
     <div class="category-chip-list"><el-tag v-for="item in categories" :key="item.id" :type="item.entry_type === 'income' ? 'success' : ''">{{ item.name }} · {{ item.entry_type === 'income' ? '进账' : '支出' }}</el-tag></div>
   </el-dialog>
+  </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete, EditPen } from '@element-plus/icons-vue'
 import { api } from '../api/http'
 
 function pad(value) { return String(value).padStart(2, '0') }

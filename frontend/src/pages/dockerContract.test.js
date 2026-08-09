@@ -17,6 +17,8 @@ test('Docker API surface includes lifecycle and log methods', () => {
   assert.match(source, /dockerAction/)
   assert.match(source, /dockerServiceAction/)
   assert.match(source, /dockerAuditLogs/)
+  assert.match(source, /compactParams/)
+  assert.match(source, /dockerLogs:.*compactParams\(params\)/)
 })
 
 test('Docker page exposes status, logs, actions, and protection guardrails', () => {

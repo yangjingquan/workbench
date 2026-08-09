@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import time
 from collections.abc import Iterator
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, BeforeValidator
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,13 @@ router = APIRouter(prefix="/api/docker", tags=["docker"])
 CONTAINER_ACTIONS = {"start", "stop", "restart", "pause", "unpause", "kill", "remove"}
 SERVICE_ACTIONS = {"start", "stop", "restart"}
 DANGEROUS_ACTIONS = {"kill", "remove"}
+
+
+def _empty_to_none(value: object) -> object:
+    return None if value == "" else value
+
+
+OptionalTimestamp = Annotated[int | None, BeforeValidator(_empty_to_none)]
 
 
 class DockerActionIn(BaseModel):
@@ -152,26 +159,37 @@ def docker_container(container_id: str, client: DockerManagerClient = Depends(ge
 def docker_logs(
     container_id: str,
     tail: int = Query(default=200, ge=1, le=5000),
-    since: int | None = None,
-    until: int | None = None,
+    since: OptionalTimestamp = None,
+    until: OptionalTimestamp = None,
     client: DockerManagerClient = Depends(get_docker_manager_client),
     user: User = Depends(get_current_user),
 ):
-    return ok(_request(client, "GET", f"/internal/v1/containers/{container_id}/logs", params={"tail": tail, "since": since, "until": until}))
+    params = {"tail": tail}
+    if since is not None:
+        params["since"] = since
+    if until is not None:
+        params["until"] = until
+    return ok(_request(client, "GET", f"/internal/v1/containers/{container_id}/logs", params=params))
 
 
 @router.get("/containers/{container_id}/logs/stream")
 def docker_log_stream(
     container_id: str,
     tail: int = Query(default=200, ge=1, le=5000),
-    since: int | None = None,
-    until: int | None = None,
+    since: OptionalTimestamp = None,
+    until: OptionalTimestamp = None,
     client: DockerManagerClient = Depends(get_docker_manager_client),
     user: User = Depends(get_current_user),
 ):
+    params = {"tail": tail}
+    if since is not None:
+        params["since"] = since
+    if until is not None:
+        params["until"] = until
+
     def events() -> Iterator[str]:
         try:
-            with client.stream_logs(container_id, params={"tail": tail, "since": since, "until": until}) as lines:
+            with client.stream_logs(container_id, params=params) as lines:
                 for line in lines:
                     yield f"{line}\n\n" if line else "\n"
         except Exception as exc:

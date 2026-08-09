@@ -16,8 +16,10 @@ class FakeAgent:
     def __init__(self):
         self.container = {"id": "abc", "name": "api-1", "state": "running", "health": "healthy"}
         self.service_result = {"project": "shop", "service": "api", "action": "restart", "items": []}
+        self.requests = []
 
     def request(self, method, path, params=None, json=None):
+        self.requests.append((method, path, params, json))
         if method == "GET" and path.endswith("/overview"):
             return {"engine": {"status": "online"}, "container_count": 1}
         if method == "GET" and path.endswith("/projects"):
@@ -126,5 +128,16 @@ def test_log_stream_is_forwarded():
         response = client.get("/api/docker/containers/abc/logs/stream")
         assert response.status_code == 200
         assert "data:" in response.text
+    finally:
+        teardown_client()
+
+
+def test_logs_accept_empty_optional_timestamps_and_omit_them_for_agent():
+    fake_agent = FakeAgent()
+    client = make_client(fake_agent)
+    try:
+        response = client.get("/api/docker/containers/abc/logs?tail=200&since=&until=")
+        assert response.status_code == 200
+        assert fake_agent.requests[-1][2] == {"tail": 200}
     finally:
         teardown_client()

@@ -9,6 +9,10 @@ function contextParams(params = {}) {
   return { ...params, workspace_id: params.workspace_id ?? workspaceId }
 }
 
+function compactParams(params = {}) {
+  return Object.fromEntries(Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== ''))
+}
+
 function forceLogout() {
   if (authExpiredHandled) return
   authExpiredHandled = true
@@ -53,5 +57,5 @@ export const api = {
   accountEntries: params => http.get('/api/accounts/entries', { params }), accountEntry: data => http.post('/api/accounts/entries', data), updateAccountEntry: (id, data) => http.put(`/api/accounts/entries/${id}`, data), deleteAccountEntry: id => http.delete(`/api/accounts/entries/${id}`), accountSummary: params => http.get('/api/accounts/summary', { params }),
   memos: params => { const values = typeof params === 'string' ? (params ? { keyword: params } : {}) : params; return http.get('/api/memos', { params: values }) }, memo: data => http.post('/api/memos', data), updateMemo: (id, data) => http.put(`/api/memos/${id}`, data), deleteMemo: id => http.delete(`/api/memos/${id}`),
   usage: data => http.post('/api/tools/usage', data), config: () => http.get('/api/config'), saveConfig: values => http.put('/api/config', { values }), dashboard: params => http.get('/api/dashboard', { params: contextParams(params) }), search: (keyword, params = {}) => http.get('/api/search', { params: contextParams({ keyword, ...params }) }),
-  dockerOverview: () => http.get('/api/docker/overview'), dockerProjects: () => http.get('/api/docker/projects'), dockerContainers: params => http.get('/api/docker/containers', { params }), dockerContainer: id => http.get(`/api/docker/containers/${id}`), dockerLogs: (id, params) => http.get(`/api/docker/containers/${id}/logs`, { params }), dockerAction: (id, action, data = {}) => http.post(`/api/docker/containers/${id}/actions/${action}`, data), dockerServiceAction: (project, service, action) => http.post(`/api/docker/services/${encodeURIComponent(project)}/${encodeURIComponent(service)}/actions/${action}`), dockerAuditLogs: params => http.get('/api/docker/audit-logs', { params })
+  dockerOverview: () => http.get('/api/docker/overview'), dockerProjects: () => http.get('/api/docker/projects'), dockerContainers: params => http.get('/api/docker/containers', { params: compactParams(params) }), dockerContainer: id => http.get(`/api/docker/containers/${id}`), dockerLogs: (id, params) => http.get(`/api/docker/containers/${id}/logs`, { params: compactParams(params) }), dockerAction: (id, action, data = {}) => http.post(`/api/docker/containers/${id}/actions/${action}`, data), dockerServiceAction: (project, service, action) => http.post(`/api/docker/services/${encodeURIComponent(project)}/${encodeURIComponent(service)}/actions/${action}`), dockerAuditLogs: params => http.get('/api/docker/audit-logs', { params })
 }

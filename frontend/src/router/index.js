@@ -16,6 +16,7 @@ const routes = [
     { path: 'toolkit', component: () => import('../pages/Toolkit.vue'), meta: { title: '开发工具箱' } },
     { path: 'accounting', component: () => import('../pages/Accounting.vue'), meta: { title: '记账存钱' } },
     { path: 'memos', component: () => import('../pages/Memos.vue'), meta: { title: '备忘录' } },
+    { path: 'docker', component: () => import('../pages/Docker.vue'), meta: { title: 'Docker 管理' } },
     { path: 'profile', component: () => import('../pages/Profile.vue'), meta: { title: '个人中心' } },
     { path: 'settings', component: () => import('../pages/Settings.vue'), meta: { title: '系统设置' } }
   ]}

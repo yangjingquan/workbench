@@ -3,6 +3,7 @@ backend/.venv/
 backend/.idea/
 backend/__pycache__/
 backend/app/**/__pycache__/
+backend/tests/**/__pycache__/
 backend/.pytest_cache/
 docker-manager/**/__pycache__/
 docker-manager/.pytest_cache/

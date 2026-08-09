@@ -13,11 +13,44 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://workbench.nexbyte.top,http://localhost:5173,http://localhost:5174,null}
+      DOCKER_MANAGER_URL: ${DOCKER_MANAGER_URL:-http://docker-manager:9100}
+      DOCKER_MANAGER_TOKEN: ${DOCKER_MANAGER_TOKEN}
+      DOCKER_PROTECTED_CONTAINERS: ${DOCKER_PROTECTED_CONTAINERS:-workbench-api,workbench-web,docker-manager,xp-mysql}
     ports:
       - "18082:8100"
     networks:
       - workbench-internal
       - shop-net
+
+  docker-manager:
+    build:
+      context: .
+      dockerfile: docker-manager/Dockerfile
+    image: workbench-docker-manager:latest
+    container_name: docker-manager
+    restart: unless-stopped
+    environment:
+      DOCKER_MANAGER_TOKEN: ${DOCKER_MANAGER_TOKEN}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    mem_limit: 256m
+    pids_limit: 128
+    expose:
+      - "9100"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - workbench-internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9100/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   workbench-web:
     build:

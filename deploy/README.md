@@ -10,6 +10,27 @@ Published ports:
 - API: `18082`
 - MySQL: existing `xp-mysql` container on `shop_shop-net`
 
+## Docker management Agent
+
+The `docker-manager` service is an internal-only container. It is the only
+Workbench service that mounts `/var/run/docker.sock`; it has no published host
+port and accepts requests only from `workbench-api` with
+`DOCKER_MANAGER_TOKEN`. Its root filesystem is read-only, it drops all Linux
+capabilities, and it uses `no-new-privileges`.
+
+Before deployment, set a random `DOCKER_MANAGER_TOKEN` and review
+`DOCKER_PROTECTED_CONTAINERS`. Verify the rendered configuration with:
+
+```bash
+docker compose config
+```
+
+The Agent exposes `/health` only on the internal Compose network. If the Agent
+is unavailable, the Docker page reports the management service as unavailable;
+the rest of Workbench remains usable. Rollback does not delete containers,
+networks, volumes, or database data: stop the updated Agent/API containers and
+restart the previous Workbench image versions.
+
 The existing `nexbyte-site` service on `18081` is not changed.
 
 ## Database migration policy

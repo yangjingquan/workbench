@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
 from app.api.routes import router
+from app.api.docker_routes import router as docker_router
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.session import SessionLocal, ensure_schema
@@ -19,6 +20,7 @@ logger = logging.getLogger("workbench")
 app = FastAPI(title="Dev Workbench API", version="1.0.0", description="程序员个人工作台 REST API")
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
+app.include_router(docker_router)
 
 
 @app.exception_handler(RequestValidationError)

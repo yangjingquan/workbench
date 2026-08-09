@@ -183,6 +183,21 @@ class Memo(TimestampMixin, Base):
     content: Mapped[str] = mapped_column(Text)
 
 
+class DockerOperationLog(Base):
+    __tablename__ = "docker_operation_log"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), index=True)
+    target_type: Mapped[str] = mapped_column(String(30))
+    target_id: Mapped[str] = mapped_column(String(160))
+    target_name: Mapped[str] = mapped_column(String(240), index=True)
+    action: Mapped[str] = mapped_column(String(30))
+    request_summary: Mapped[dict] = mapped_column(JSON, default=dict)
+    result: Mapped[str] = mapped_column(String(20), index=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+
+
 class ProjectMilestone(TimestampMixin, Base):
     __tablename__ = "project_milestone"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

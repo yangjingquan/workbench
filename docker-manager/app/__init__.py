@@ -1,1 +1,0 @@
-"""Docker manager Agent package."""

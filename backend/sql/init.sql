@@ -89,10 +89,3 @@ CREATE TABLE IF NOT EXISTS system_config (
   id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, config_key VARCHAR(100) NOT NULL, config_value JSON, INDEX(user_id), INDEX(config_key),
   CONSTRAINT fk_config_user FOREIGN KEY(user_id) REFERENCES `user`(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-CREATE TABLE IF NOT EXISTS docker_operation_log (
-  id INT PRIMARY KEY AUTO_INCREMENT, user_id INT NOT NULL, target_type VARCHAR(30) NOT NULL, target_id VARCHAR(160) NOT NULL,
-  target_name VARCHAR(240) NOT NULL, action VARCHAR(30) NOT NULL, request_summary JSON, result VARCHAR(20) NOT NULL,
-  error_message TEXT NULL, duration_ms INT NOT NULL DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  INDEX(user_id), INDEX(target_name), INDEX(result), INDEX(created_at),
-  CONSTRAINT fk_docker_log_user FOREIGN KEY(user_id) REFERENCES `user`(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

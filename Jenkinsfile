@@ -12,6 +12,7 @@ pipeline {
 
   environment {
     DEPLOY_DIR = '/opt/shop/workbench'
+    HOST_WORKSPACE = '/opt/jenkins/jenkins_home/workspace/workbench'
   }
 
   stages {
@@ -46,22 +47,10 @@ pipeline {
       steps {
         sh '''
           set -eu
-          test -f "$WORKSPACE/docker-compose.yml"
-          test -f "$WORKSPACE/docker-manager/Dockerfile"
-          grep -Fq '  docker-manager:' "$WORKSPACE/docker-compose.yml"
-          source_build_id=$(git -C "$WORKSPACE" rev-parse --short HEAD)
-          test "$source_build_id" = "$WORKBENCH_BUILD_ID"
-          archive_file=$(mktemp)
-          trap 'rm -f "$archive_file"' EXIT
-          tar -C "$WORKSPACE" -cf "$archive_file" .
-          docker run --rm -i \
+          docker run --rm \
+            -v "$HOST_WORKSPACE:/source:ro" \
             -v "$DEPLOY_DIR:/target" \
-            alpine:3.20 sh -c 'tar -C /target -xf -' < "$archive_file"
-          test -f "$DEPLOY_DIR/docker-compose.yml"
-          test -f "$DEPLOY_DIR/docker-manager/Dockerfile"
-          grep -Fq '  docker-manager:' "$DEPLOY_DIR/docker-compose.yml"
-          target_build_id=$(git -C "$DEPLOY_DIR" rev-parse --short HEAD)
-          test "$target_build_id" = "$WORKBENCH_BUILD_ID"
+            alpine:3.20 sh -c 'cp -a /source/. /target/'
           if [ ! -f "$DEPLOY_DIR/.env" ]; then
             set +x
             umask 077
@@ -80,23 +69,6 @@ pipeline {
             set -x
           fi
           set +x
-          ensure_env_value() {
-            env_key="$1"
-            env_value="$2"
-            if grep -q "^${env_key}=" "$DEPLOY_DIR/.env"; then
-              sed -i "s#^${env_key}=.*#${env_key}=${env_value}#" "$DEPLOY_DIR/.env"
-            else
-              printf '%s=%s\n' "$env_key" "$env_value" >> "$DEPLOY_DIR/.env"
-            fi
-          }
-          docker_manager_token=$(sed -n 's/^DOCKER_MANAGER_TOKEN=//p' "$DEPLOY_DIR/.env" | tail -n 1)
-          if [ -z "$docker_manager_token" ]; then
-            docker_manager_token=$(openssl rand -hex 32)
-          fi
-          ensure_env_value 'DOCKER_MANAGER_TOKEN' "$docker_manager_token"
-          ensure_env_value 'DOCKER_MANAGER_URL' 'http://docker-manager:9100'
-          ensure_env_value 'DOCKER_PROTECTED_CONTAINERS' 'workbench-api,workbench-web,docker-manager,xp-mysql'
-          unset docker_manager_token
           mysql_password=$(docker inspect xp-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^MYSQL_ROOT_PASSWORD=//p')
           test -n "$mysql_password"
           sed -i "s#^MYSQL_ROOT_PASSWORD=.*#MYSQL_ROOT_PASSWORD=$mysql_password#" "$DEPLOY_DIR/.env"
@@ -121,7 +93,7 @@ pipeline {
         sh '''
           set -eu
           cd "$DEPLOY_DIR"
-          VITE_BUILD_ID="$WORKBENCH_BUILD_ID" docker compose --project-name workbench up -d --build docker-manager workbench-api workbench-web
+          VITE_BUILD_ID="$WORKBENCH_BUILD_ID" docker compose --project-name workbench up -d --build workbench-api workbench-web
           if docker ps -a --format '{{.Names}}' | grep -qx workbench-db; then docker rm -f workbench-db; fi
         '''
       }
@@ -131,10 +103,10 @@ pipeline {
       steps {
         sh '''
           set -eu
-          test -f "$WORKSPACE/deploy/nginx/workbench.conf"
-          docker run --rm -i \
+          docker run --rm \
             -v /opt/jenkins/nginx/conf.d:/target \
-            alpine:3.20 sh -c 'if [ -f /target/workbench.conf ]; then mv /target/workbench.conf /target/workbench.conf.disabled; fi; cat > /target/000-workbench.conf' < "$WORKSPACE/deploy/nginx/workbench.conf"
+            -v "$HOST_WORKSPACE/deploy/nginx/workbench.conf:/source/workbench.conf:ro" \
+            alpine:3.20 sh -c 'cp /source/workbench.conf /target/workbench.conf'
           docker exec ai-shop-jenkins-proxy nginx -t
           docker exec ai-shop-jenkins-proxy nginx -s reload
         '''
@@ -146,20 +118,7 @@ pipeline {
         sh '''
           set -eu
           cd "$DEPLOY_DIR"
-          docker compose --project-name workbench config --services | grep -qx 'docker-manager'
           docker compose --project-name workbench ps
-          for attempt in $(seq 1 30); do
-            agent_health=$(docker inspect docker-manager --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}')
-            if [ "$agent_health" = 'healthy' ]; then break; fi
-            if [ "$attempt" -eq 30 ]; then
-              docker inspect docker-manager --format 'docker-manager health: {{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}'
-              exit 1
-            fi
-            sleep 2
-          done
-          test "$(docker inspect docker-manager --format '{{.State.Status}}')" = 'running'
-          docker inspect docker-manager --format '{{range .Mounts}}{{println .Source .Destination}}{{end}}' | grep -Fq '/var/run/docker.sock /var/run/docker.sock'
-          docker exec workbench-api python -c 'import os, urllib.request; request = urllib.request.Request("http://docker-manager:9100/internal/v1/overview", headers={"X-Docker-Manager-Token": os.environ["DOCKER_MANAGER_TOKEN"]}); response = urllib.request.urlopen(request, timeout=10); assert response.status == 200; print("API to docker-manager check passed")'
           HOST_GATEWAY=$(docker inspect ai-shop-jenkins --format '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' | head -n 1)
           for attempt in $(seq 1 30); do
             if curl -fsS --max-time 5 "http://${HOST_GATEWAY}:18082/health"; then break; fi

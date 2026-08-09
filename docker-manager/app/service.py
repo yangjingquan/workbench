@@ -30,32 +30,31 @@ class DockerService:
     def list_overview(self) -> dict[str, Any]:
         try:
             containers = self._list_containers()
-            summaries = [self._summary(container, include_resources=False) for container in containers]
-            project_names = {item["project"] for item in summaries if item["project"]}
+            projects = self.list_projects()
         except DockerException as exc:
             raise DockerEngineError(str(exc)) from exc
 
-        running = sum(item["state"] == "running" for item in summaries)
-        abnormal = sum(item["health"] == "unhealthy" or item["state"] in {"dead", "restarting"} for item in summaries)
+        running = sum(item["state"] == "running" for item in containers)
+        abnormal = sum(item["health"] == "unhealthy" or item["state"] in {"dead", "restarting"} for item in containers)
         resources = {
-            "cpu_percent": 0.0,
-            "memory_usage_bytes": 0,
-            "memory_limit_bytes": 0,
+            "cpu_percent": round(sum(item["resources"]["cpu_percent"] for item in containers), 2),
+            "memory_usage_bytes": sum(item["resources"]["memory_usage_bytes"] for item in containers),
+            "memory_limit_bytes": sum(item["resources"]["memory_limit_bytes"] for item in containers),
         }
         return {
             "engine": {"status": "online", "version": self._engine_version()},
-            "container_count": len(summaries),
+            "container_count": len(containers),
             "running_count": running,
-            "stopped_count": len(summaries) - running,
+            "stopped_count": len(containers) - running,
             "abnormal_count": abnormal,
-            "project_count": len(project_names),
+            "project_count": len(projects),
             "resources": resources,
         }
 
     def list_projects(self) -> list[dict[str, Any]]:
         groups: dict[str, dict[str, Any]] = defaultdict(lambda: {"name": "", "containers": [], "services": {}})
         for container in self._list_containers():
-            summary = self._summary(container, include_resources=False)
+            summary = self._summary(container)
             project = summary["project"] or "独立容器"
             group = groups[project]
             group["name"] = project
@@ -81,7 +80,7 @@ class DockerService:
         filters = filters or {}
         result = []
         for container in self._list_containers():
-            summary = self._summary(container, include_resources=False)
+            summary = self._summary(container)
             if filters.get("project") and summary["project"] != filters["project"]:
                 continue
             if filters.get("service") and summary["service"] != filters["service"]:
@@ -102,41 +101,28 @@ class DockerService:
     def get_logs(self, container_id: str, tail: int = 200, since: int | None = None, until: int | None = None) -> dict[str, Any]:
         container = self._get_container(container_id)
         try:
-            lines = self._read_log_lines(container, tail=tail, since=since, until=until)
-        except Exception as exc:
-            raise DockerEngineError(f"读取容器日志失败：{exc}") from exc
-        return {"container_id": container.id, "lines": lines}
+            raw = container.logs(stdout=True, stderr=True, timestamps=True, tail=tail, since=since, until=until, demux=True)
+        except DockerException as exc:
+            raise DockerEngineError(str(exc)) from exc
+        return {"container_id": container.id, "lines": list(self._decode_log_chunks(raw))}
 
     def stream_logs(self, container_id: str, tail: int = 200, since: int | None = None, until: int | None = None) -> Iterator[dict[str, str]]:
         container = self._get_container(container_id)
         try:
-            yield from self._read_log_stream(container, tail=tail, since=since, until=until)
-        except Exception as exc:
-            raise DockerEngineError(f"读取容器日志失败：{exc}") from exc
-
-    def _read_log_lines(self, container: Any, *, tail: int, since: int | None, until: int | None) -> list[dict[str, str]]:
-        raw = container.logs(stdout=True, stderr=True, timestamps=True, tail=tail, since=since, until=until)
-        return list(self._decode_log_chunks(raw))
-
-    def _read_log_stream(
-        self,
-        container: Any,
-        *,
-        tail: int,
-        since: int | None,
-        until: int | None,
-    ) -> Iterator[dict[str, str]]:
-        chunks = container.logs(
-            stdout=True,
-            stderr=True,
-            timestamps=True,
-            tail=tail,
-            since=since,
-            until=until,
-            stream=True,
-            follow=True,
-        )
-        yield from self._decode_log_chunks(chunks)
+            chunks = container.logs(
+                stdout=True,
+                stderr=True,
+                timestamps=True,
+                tail=tail,
+                since=since,
+                until=until,
+                demux=True,
+                stream=True,
+                follow=True,
+            )
+            yield from self._decode_log_chunks(chunks)
+        except DockerException as exc:
+            raise DockerEngineError(str(exc)) from exc
 
     def container_action(self, container_id: str, action: str) -> dict[str, Any]:
         if action not in CONTAINER_ACTIONS:
@@ -184,7 +170,7 @@ class DockerService:
         except DockerException:
             return None
 
-    def _summary(self, container: Any, include_details: bool = False, include_resources: bool = True) -> dict[str, Any]:
+    def _summary(self, container: Any, include_details: bool = False) -> dict[str, Any]:
         attrs = getattr(container, "attrs", {}) or {}
         state_attrs = attrs.get("State", {}) or {}
         status = getattr(container, "status", None) or state_attrs.get("Status", "unknown")
@@ -206,7 +192,7 @@ class DockerService:
             "finished_at": state_attrs.get("FinishedAt"),
             "restart_count": int((attrs.get("HostConfig") or {}).get("RestartCount", 0) or 0),
             "ports": self._ports((attrs.get("NetworkSettings") or {}).get("Ports") or {}),
-            "resources": self._stats(container, state) if include_resources else self._empty_stats(),
+            "resources": self._stats(container, state),
         }
         if include_details:
             summary.update(
@@ -235,12 +221,8 @@ class DockerService:
         return result
 
     @staticmethod
-    def _empty_stats() -> dict[str, float | int]:
-        return {"cpu_percent": 0.0, "memory_usage_bytes": 0, "memory_limit_bytes": 0, "memory_percent": 0.0}
-
-    @classmethod
-    def _stats(cls, container: Any, state: str) -> dict[str, float | int]:
-        empty = cls._empty_stats()
+    def _stats(container: Any, state: str) -> dict[str, float | int]:
+        empty = {"cpu_percent": 0.0, "memory_usage_bytes": 0, "memory_limit_bytes": 0, "memory_percent": 0.0}
         if state != "running":
             return empty
         try:
@@ -265,8 +247,6 @@ class DockerService:
 
     @staticmethod
     def _decode_log_chunks(chunks: Iterable[Any]) -> Iterator[dict[str, str]]:
-        if isinstance(chunks, (bytes, bytearray, str)):
-            chunks = [chunks]
         for chunk in chunks or []:
             if isinstance(chunk, tuple):
                 stdout, stderr = chunk

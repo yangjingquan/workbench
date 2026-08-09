@@ -6,7 +6,6 @@
         <div class="nav-section" v-if="!app.collapsed">WORKSPACE</div>
         <RouterLink v-for="item in mainNav" :key="item.path" :to="item.path" class="nav-item" :title="app.collapsed ? item.label : undefined"><el-icon><component :is="item.icon" /></el-icon><span v-if="!app.collapsed">{{ item.label }}</span></RouterLink>
         <div class="nav-section" v-if="!app.collapsed">TOOLS</div>
-        <RouterLink to="/docker" class="nav-item" :title="app.collapsed ? 'Docker 管理' : undefined"><el-icon><Monitor /></el-icon><span v-if="!app.collapsed">Docker 管理</span></RouterLink>
         <RouterLink to="/toolkit" class="nav-item" :title="app.collapsed ? '开发工具箱' : undefined"><el-icon><Tools /></el-icon><span v-if="!app.collapsed">开发工具箱</span><span v-if="!app.collapsed" class="nav-badge">4</span></RouterLink>
         <RouterLink to="/accounting" class="nav-item" :title="app.collapsed ? '记账存钱' : undefined"><el-icon><Wallet /></el-icon><span v-if="!app.collapsed">记账存钱</span></RouterLink>
         <RouterLink to="/memos" class="nav-item" :title="app.collapsed ? '备忘录' : undefined"><el-icon><Memo /></el-icon><span v-if="!app.collapsed">备忘录</span></RouterLink>
@@ -24,15 +23,15 @@
         </button>
         <div class="breadcrumb"><span class="eyebrow">PERSONAL OS</span><span class="slash">/</span><span>{{ route.meta.title || '总览看板' }}</span></div>
         <div class="top-actions">
-          <el-select v-if="!isGlobalContextRoute" class="workspace-context-select" :model-value="app.currentWorkspaceId" placeholder="工作区" clearable @change="app.selectWorkspace"><el-option v-for="workspace in app.workspaces" :key="workspace.id" :label="workspace.name" :value="workspace.id" /></el-select>
-          <el-select v-if="!isGlobalContextRoute" class="project-context-select" :model-value="app.currentProjectId" placeholder="全部项目" clearable @change="app.selectProject"><el-option v-for="project in app.projects.filter(item => !app.currentWorkspaceId || item.workspace_id === app.currentWorkspaceId)" :key="project.id" :label="project.name" :value="project.id" /></el-select>
+          <el-select v-if="!isGlobalMemoRoute" class="workspace-context-select" :model-value="app.currentWorkspaceId" placeholder="工作区" clearable @change="app.selectWorkspace"><el-option v-for="workspace in app.workspaces" :key="workspace.id" :label="workspace.name" :value="workspace.id" /></el-select>
+          <el-select v-if="!isGlobalMemoRoute" class="project-context-select" :model-value="app.currentProjectId" placeholder="全部项目" clearable @change="app.selectProject"><el-option v-for="project in app.projects.filter(item => !app.currentWorkspaceId || item.workspace_id === app.currentWorkspaceId)" :key="project.id" :label="project.name" :value="project.id" /></el-select>
           <button class="icon-button" title="全局检索" @click="searchOpen = true"><el-icon><Search /></el-icon></button>
           <button class="icon-button" title="切换主题模式" aria-label="切换浅色或暗黑模式" @click="app.toggleTheme()"><el-icon><Moon v-if="app.theme === 'light'" /><Sunny v-else /></el-icon></button>
           <button class="icon-button accent-toggle" :title="app.accentTheme === 'indigo' ? '切换到天蓝青绿' : '切换到蓝紫品牌'" :aria-label="app.accentTheme === 'indigo' ? '切换到天蓝青绿主题' : '切换到蓝紫品牌主题'" @click="app.toggleAccentTheme()"><span :class="['accent-swatch', app.accentTheme]" /></button>
           <el-dropdown trigger="click" @command="handleUserCommand"><div class="avatar-wrap"><el-avatar :size="34" :src="app.user?.avatar_url || ''">{{ (app.user?.display_name || '管')[0] }}</el-avatar><span class="online-dot" /></div><template #dropdown><el-dropdown-menu><el-dropdown-item command="profile">个人中心</el-dropdown-item><el-dropdown-item divided command="logout">退出登录</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
         </div>
       </header>
-      <div v-if="!isGlobalContextRoute" class="mobile-context-switcher" aria-label="切换工作区和项目">
+      <div v-if="!isGlobalMemoRoute" class="mobile-context-switcher" aria-label="切换工作区和项目">
         <el-select
           class="mobile-context-select"
           :model-value="app.currentWorkspaceId"
@@ -56,7 +55,7 @@
           />
         </el-select>
       </div>
-      <section class="content-scroll"><RouterView :key="isGlobalContextRoute ? route.fullPath : `${route.fullPath}:${app.currentWorkspaceId || 'all'}:${app.currentProjectId || 'all'}`" /></section>
+      <section class="content-scroll"><RouterView :key="isGlobalMemoRoute ? route.fullPath : `${route.fullPath}:${app.currentWorkspaceId || 'all'}:${app.currentProjectId || 'all'}`" /></section>
     </main>
     <Transition name="mobile-nav">
       <div v-if="mobileNav.open" class="mobile-nav-layer" @keydown="handleMobileNavKeydown">
@@ -70,7 +69,6 @@
             <div class="nav-section">WORKSPACE</div>
             <RouterLink v-for="item in mainNav" :key="item.path" :to="item.path" class="nav-item" @click="closeMobileMenu"><el-icon><component :is="item.icon" /></el-icon><span>{{ item.label }}</span></RouterLink>
             <div class="nav-section">TOOLS</div>
-            <RouterLink to="/docker" class="nav-item" @click="closeMobileMenu"><el-icon><Monitor /></el-icon><span>Docker 管理</span></RouterLink>
             <RouterLink to="/toolkit" class="nav-item" @click="closeMobileMenu"><el-icon><Tools /></el-icon><span>开发工具箱</span><span class="nav-badge">4</span></RouterLink>
             <RouterLink to="/accounting" class="nav-item" @click="closeMobileMenu"><el-icon><Wallet /></el-icon><span>记账存钱</span></RouterLink>
             <RouterLink to="/memos" class="nav-item" @click="closeMobileMenu"><el-icon><Memo /></el-icon><span>备忘录</span></RouterLink>
@@ -93,8 +91,8 @@ import { useAppStore } from '../stores'
 import { api } from '../api/http'
 import ReminderPoll from '../components/ReminderPoll.vue'
 import { createMobileNavState, toggleMobileNav, closeMobileNav } from './mobileNav'
-import { Odometer, Calendar, Bell, List, Link, FolderOpened, Monitor, Tools, Wallet, Memo, Setting, SwitchButton, Search, Moon, Sunny, DArrowLeft, DArrowRight, Menu, Close } from '@element-plus/icons-vue'
-const app = useAppStore(); const route = useRoute(); const router = useRouter(); const isGlobalContextRoute = computed(() => ['/memos', '/docker'].includes(route.path)); const searchOpen = ref(false); const keyword = ref(''); const results = ref(null)
+import { Odometer, Calendar, Bell, List, Link, FolderOpened, Tools, Wallet, Memo, Setting, SwitchButton, Search, Moon, Sunny, DArrowLeft, DArrowRight, Menu, Close } from '@element-plus/icons-vue'
+const app = useAppStore(); const route = useRoute(); const router = useRouter(); const isGlobalMemoRoute = computed(() => route.path === '/memos'); const searchOpen = ref(false); const keyword = ref(''); const results = ref(null)
 const mobileNav = reactive(createMobileNavState())
 const mobileMenuTrigger = ref(null)
 const mobileNavClose = ref(null)

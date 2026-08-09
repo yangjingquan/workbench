@@ -13,7 +13,6 @@ class FakeContainer:
         self.attrs = attrs or {}
         self.log_chunks = log_chunks or []
         self.actions = []
-        self.stats_calls = 0
 
     def start(self): self.actions.append("start")
     def stop(self): self.actions.append("stop")
@@ -22,9 +21,7 @@ class FakeContainer:
     def unpause(self): self.actions.append("unpause")
     def kill(self): self.actions.append("kill")
     def remove(self): self.actions.append("remove")
-    def stats(self, stream=False):
-        self.stats_calls += 1
-        return {}
+    def stats(self, stream=False): return {}
     def logs(self, **kwargs): return self.log_chunks
 
 
@@ -89,37 +86,3 @@ def test_logs_preserve_stream_and_strip_timestamp():
         {"timestamp": "2026-08-09T01:02:03Z", "stream": "stdout", "message": "hello"},
         {"timestamp": "2026-08-09T01:02:04Z", "stream": "stderr", "message": "error"},
     ]
-
-
-def test_logs_support_docker_sdk_without_demux_argument():
-    class TtyContainer(FakeContainer):
-        def __init__(self):
-            super().__init__("tty", "tty-container")
-            self.log_calls = []
-
-        def logs(self, **kwargs):
-            self.log_calls.append(kwargs)
-            return b"2026-08-09T01:02:03Z tty output\n"
-
-    container = TtyContainer()
-    result = DockerService(FakeDockerClient([container])).get_logs("tty")
-
-    assert result["lines"] == [{"timestamp": "2026-08-09T01:02:03Z", "stream": "stdout", "message": "tty output"}]
-    assert "demux" not in container.log_calls[0]
-
-
-def test_overview_reads_container_state_without_blocking_on_stats():
-    container = FakeContainer(
-        id="abc123",
-        name="api-1",
-        status="running",
-        labels={"com.docker.compose.project": "shop", "com.docker.compose.service": "api"},
-        attrs={"State": {"Status": "running"}, "Config": {"Image": "shop-api:latest"}},
-    )
-
-    result = DockerService(FakeDockerClient([container])).list_overview()
-
-    assert result["container_count"] == 1
-    assert result["running_count"] == 1
-    assert result["project_count"] == 1
-    assert container.stats_calls == 0

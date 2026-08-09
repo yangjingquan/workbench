@@ -91,6 +91,25 @@ def test_logs_preserve_stream_and_strip_timestamp():
     ]
 
 
+def test_logs_fall_back_when_demux_is_not_supported_by_container():
+    class TtyContainer(FakeContainer):
+        def __init__(self):
+            super().__init__("tty", "tty-container")
+            self.log_calls = []
+
+        def logs(self, **kwargs):
+            self.log_calls.append(kwargs)
+            if kwargs["demux"]:
+                raise TypeError("demux is not supported for TTY containers")
+            return b"2026-08-09T01:02:03Z tty output\n"
+
+    container = TtyContainer()
+    result = DockerService(FakeDockerClient([container])).get_logs("tty")
+
+    assert result["lines"] == [{"timestamp": "2026-08-09T01:02:03Z", "stream": "stdout", "message": "tty output"}]
+    assert [call["demux"] for call in container.log_calls] == [True, False]
+
+
 def test_overview_reads_container_state_without_blocking_on_stats():
     container = FakeContainer(
         id="abc123",

@@ -102,28 +102,49 @@ class DockerService:
     def get_logs(self, container_id: str, tail: int = 200, since: int | None = None, until: int | None = None) -> dict[str, Any]:
         container = self._get_container(container_id)
         try:
-            raw = container.logs(stdout=True, stderr=True, timestamps=True, tail=tail, since=since, until=until, demux=True)
-        except DockerException as exc:
-            raise DockerEngineError(str(exc)) from exc
-        return {"container_id": container.id, "lines": list(self._decode_log_chunks(raw))}
+            lines = self._read_log_lines(container, tail=tail, since=since, until=until, demux=True)
+        except Exception as exc:
+            try:
+                lines = self._read_log_lines(container, tail=tail, since=since, until=until, demux=False)
+            except Exception as fallback_exc:
+                raise DockerEngineError(f"读取容器日志失败：{fallback_exc}") from exc
+        return {"container_id": container.id, "lines": lines}
 
     def stream_logs(self, container_id: str, tail: int = 200, since: int | None = None, until: int | None = None) -> Iterator[dict[str, str]]:
         container = self._get_container(container_id)
         try:
-            chunks = container.logs(
-                stdout=True,
-                stderr=True,
-                timestamps=True,
-                tail=tail,
-                since=since,
-                until=until,
-                demux=True,
-                stream=True,
-                follow=True,
-            )
-            yield from self._decode_log_chunks(chunks)
-        except DockerException as exc:
-            raise DockerEngineError(str(exc)) from exc
+            yield from self._read_log_stream(container, tail=tail, since=since, until=until, demux=True)
+        except Exception as exc:
+            try:
+                yield from self._read_log_stream(container, tail=tail, since=since, until=until, demux=False)
+            except Exception as fallback_exc:
+                raise DockerEngineError(f"读取容器日志失败：{fallback_exc}") from exc
+
+    def _read_log_lines(self, container: Any, *, tail: int, since: int | None, until: int | None, demux: bool) -> list[dict[str, str]]:
+        raw = container.logs(stdout=True, stderr=True, timestamps=True, tail=tail, since=since, until=until, demux=demux)
+        return list(self._decode_log_chunks(raw))
+
+    def _read_log_stream(
+        self,
+        container: Any,
+        *,
+        tail: int,
+        since: int | None,
+        until: int | None,
+        demux: bool,
+    ) -> Iterator[dict[str, str]]:
+        chunks = container.logs(
+            stdout=True,
+            stderr=True,
+            timestamps=True,
+            tail=tail,
+            since=since,
+            until=until,
+            demux=demux,
+            stream=True,
+            follow=True,
+        )
+        yield from self._decode_log_chunks(chunks)
 
     def container_action(self, container_id: str, action: str) -> dict[str, Any]:
         if action not in CONTAINER_ACTIONS:
@@ -252,6 +273,8 @@ class DockerService:
 
     @staticmethod
     def _decode_log_chunks(chunks: Iterable[Any]) -> Iterator[dict[str, str]]:
+        if isinstance(chunks, (bytes, bytearray, str)):
+            chunks = [chunks]
         for chunk in chunks or []:
             if isinstance(chunk, tuple):
                 stdout, stderr = chunk

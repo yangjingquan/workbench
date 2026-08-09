@@ -30,31 +30,32 @@ class DockerService:
     def list_overview(self) -> dict[str, Any]:
         try:
             containers = self._list_containers()
-            projects = self.list_projects()
+            summaries = [self._summary(container, include_resources=False) for container in containers]
+            project_names = {item["project"] for item in summaries if item["project"]}
         except DockerException as exc:
             raise DockerEngineError(str(exc)) from exc
 
-        running = sum(item["state"] == "running" for item in containers)
-        abnormal = sum(item["health"] == "unhealthy" or item["state"] in {"dead", "restarting"} for item in containers)
+        running = sum(item["state"] == "running" for item in summaries)
+        abnormal = sum(item["health"] == "unhealthy" or item["state"] in {"dead", "restarting"} for item in summaries)
         resources = {
-            "cpu_percent": round(sum(item["resources"]["cpu_percent"] for item in containers), 2),
-            "memory_usage_bytes": sum(item["resources"]["memory_usage_bytes"] for item in containers),
-            "memory_limit_bytes": sum(item["resources"]["memory_limit_bytes"] for item in containers),
+            "cpu_percent": 0.0,
+            "memory_usage_bytes": 0,
+            "memory_limit_bytes": 0,
         }
         return {
             "engine": {"status": "online", "version": self._engine_version()},
-            "container_count": len(containers),
+            "container_count": len(summaries),
             "running_count": running,
-            "stopped_count": len(containers) - running,
+            "stopped_count": len(summaries) - running,
             "abnormal_count": abnormal,
-            "project_count": len(projects),
+            "project_count": len(project_names),
             "resources": resources,
         }
 
     def list_projects(self) -> list[dict[str, Any]]:
         groups: dict[str, dict[str, Any]] = defaultdict(lambda: {"name": "", "containers": [], "services": {}})
         for container in self._list_containers():
-            summary = self._summary(container)
+            summary = self._summary(container, include_resources=False)
             project = summary["project"] or "独立容器"
             group = groups[project]
             group["name"] = project
@@ -80,7 +81,7 @@ class DockerService:
         filters = filters or {}
         result = []
         for container in self._list_containers():
-            summary = self._summary(container)
+            summary = self._summary(container, include_resources=False)
             if filters.get("project") and summary["project"] != filters["project"]:
                 continue
             if filters.get("service") and summary["service"] != filters["service"]:
@@ -170,7 +171,7 @@ class DockerService:
         except DockerException:
             return None
 
-    def _summary(self, container: Any, include_details: bool = False) -> dict[str, Any]:
+    def _summary(self, container: Any, include_details: bool = False, include_resources: bool = True) -> dict[str, Any]:
         attrs = getattr(container, "attrs", {}) or {}
         state_attrs = attrs.get("State", {}) or {}
         status = getattr(container, "status", None) or state_attrs.get("Status", "unknown")
@@ -192,7 +193,7 @@ class DockerService:
             "finished_at": state_attrs.get("FinishedAt"),
             "restart_count": int((attrs.get("HostConfig") or {}).get("RestartCount", 0) or 0),
             "ports": self._ports((attrs.get("NetworkSettings") or {}).get("Ports") or {}),
-            "resources": self._stats(container, state),
+            "resources": self._stats(container, state) if include_resources else self._empty_stats(),
         }
         if include_details:
             summary.update(
@@ -221,8 +222,12 @@ class DockerService:
         return result
 
     @staticmethod
-    def _stats(container: Any, state: str) -> dict[str, float | int]:
-        empty = {"cpu_percent": 0.0, "memory_usage_bytes": 0, "memory_limit_bytes": 0, "memory_percent": 0.0}
+    def _empty_stats() -> dict[str, float | int]:
+        return {"cpu_percent": 0.0, "memory_usage_bytes": 0, "memory_limit_bytes": 0, "memory_percent": 0.0}
+
+    @classmethod
+    def _stats(cls, container: Any, state: str) -> dict[str, float | int]:
+        empty = cls._empty_stats()
         if state != "running":
             return empty
         try:

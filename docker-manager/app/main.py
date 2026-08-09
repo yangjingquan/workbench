@@ -26,7 +26,7 @@ def get_docker_service() -> DockerService:
     if _service is None:
         if docker is None:
             raise DockerEngineError("Docker SDK 未安装")
-        _service = DockerService(docker.from_env())
+        _service = DockerService(docker.from_env(timeout=8))
     return _service
 
 

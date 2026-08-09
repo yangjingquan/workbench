@@ -102,26 +102,20 @@ class DockerService:
     def get_logs(self, container_id: str, tail: int = 200, since: int | None = None, until: int | None = None) -> dict[str, Any]:
         container = self._get_container(container_id)
         try:
-            lines = self._read_log_lines(container, tail=tail, since=since, until=until, demux=True)
+            lines = self._read_log_lines(container, tail=tail, since=since, until=until)
         except Exception as exc:
-            try:
-                lines = self._read_log_lines(container, tail=tail, since=since, until=until, demux=False)
-            except Exception as fallback_exc:
-                raise DockerEngineError(f"读取容器日志失败：{fallback_exc}") from exc
+            raise DockerEngineError(f"读取容器日志失败：{exc}") from exc
         return {"container_id": container.id, "lines": lines}
 
     def stream_logs(self, container_id: str, tail: int = 200, since: int | None = None, until: int | None = None) -> Iterator[dict[str, str]]:
         container = self._get_container(container_id)
         try:
-            yield from self._read_log_stream(container, tail=tail, since=since, until=until, demux=True)
+            yield from self._read_log_stream(container, tail=tail, since=since, until=until)
         except Exception as exc:
-            try:
-                yield from self._read_log_stream(container, tail=tail, since=since, until=until, demux=False)
-            except Exception as fallback_exc:
-                raise DockerEngineError(f"读取容器日志失败：{fallback_exc}") from exc
+            raise DockerEngineError(f"读取容器日志失败：{exc}") from exc
 
-    def _read_log_lines(self, container: Any, *, tail: int, since: int | None, until: int | None, demux: bool) -> list[dict[str, str]]:
-        raw = container.logs(stdout=True, stderr=True, timestamps=True, tail=tail, since=since, until=until, demux=demux)
+    def _read_log_lines(self, container: Any, *, tail: int, since: int | None, until: int | None) -> list[dict[str, str]]:
+        raw = container.logs(stdout=True, stderr=True, timestamps=True, tail=tail, since=since, until=until)
         return list(self._decode_log_chunks(raw))
 
     def _read_log_stream(
@@ -131,7 +125,6 @@ class DockerService:
         tail: int,
         since: int | None,
         until: int | None,
-        demux: bool,
     ) -> Iterator[dict[str, str]]:
         chunks = container.logs(
             stdout=True,
@@ -140,7 +133,6 @@ class DockerService:
             tail=tail,
             since=since,
             until=until,
-            demux=demux,
             stream=True,
             follow=True,
         )

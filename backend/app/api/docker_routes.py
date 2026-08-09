@@ -104,6 +104,21 @@ def _request(client: DockerManagerClient, method: str, path: str, **kwargs: Any)
         raise _agent_error(exc) from exc
 
 
+def _decorate_protection(payload: dict[str, Any]) -> dict[str, Any]:
+    def decorate(container: dict[str, Any]) -> None:
+        container["protected"] = container.get("name") in settings.protected_container_names
+
+    for container in payload.get("containers", []):
+        decorate(container)
+    for project in payload.get("projects", []):
+        for service in project.get("services", []):
+            for container in service.get("containers", []):
+                decorate(container)
+    if payload.get("name"):
+        decorate(payload)
+    return payload
+
+
 @router.get("/overview")
 def docker_overview(client: DockerManagerClient = Depends(get_docker_manager_client), user: User = Depends(get_current_user)):
     return ok(_request(client, "GET", "/internal/v1/overview"))
@@ -111,7 +126,7 @@ def docker_overview(client: DockerManagerClient = Depends(get_docker_manager_cli
 
 @router.get("/projects")
 def docker_projects(client: DockerManagerClient = Depends(get_docker_manager_client), user: User = Depends(get_current_user)):
-    return ok(_request(client, "GET", "/internal/v1/projects"))
+    return ok(_decorate_protection(_request(client, "GET", "/internal/v1/projects")))
 
 
 @router.get("/containers")
@@ -125,12 +140,12 @@ def docker_containers(
     user: User = Depends(get_current_user),
 ):
     params = {key: value for key, value in {"project": project, "service": service, "state": state, "health": health, "keyword": keyword}.items() if value}
-    return ok(_request(client, "GET", "/internal/v1/containers", params=params))
+    return ok(_decorate_protection(_request(client, "GET", "/internal/v1/containers", params=params)))
 
 
 @router.get("/containers/{container_id}")
 def docker_container(container_id: str, client: DockerManagerClient = Depends(get_docker_manager_client), user: User = Depends(get_current_user)):
-    return ok(_request(client, "GET", f"/internal/v1/containers/{container_id}"))
+    return ok(_decorate_protection(_request(client, "GET", f"/internal/v1/containers/{container_id}")))
 
 
 @router.get("/containers/{container_id}/logs")

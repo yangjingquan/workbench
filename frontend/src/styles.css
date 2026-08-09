@@ -45,6 +45,31 @@ html.dark { --bg: #10121c; --surface: #181b29; --surface-2: #202435; --line: #2b
 @media (max-width:900px) { .account-entry-grid, .memo-layout { grid-template-columns:1fr } }
 @media (max-width:760px) { .account-stat-cards { grid-template-columns:1fr } .account-trend-item { gap:8px; grid-template-columns:1fr; } .category-create-row { flex-wrap:wrap } .category-create-row .el-input { flex:1 1 100% } }
 
+/* Docker management */
+.docker-stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; margin-bottom:22px }
+.docker-last-refresh { color:var(--muted); font-size:12px; margin-right:4px }
+.docker-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:22px; padding:14px 18px }
+.docker-view-tabs { display:flex; gap:4px; padding:4px; border-radius:10px; background:var(--surface-2) }
+.docker-view-tab { padding:8px 14px; border-radius:8px; color:var(--muted); background:transparent; font-weight:650 }
+.docker-view-tab.active { color:var(--primary); background:var(--surface); box-shadow:var(--shadow) }
+.docker-filter-row { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; flex:1 }
+.docker-keyword { width:210px }.docker-filter { width:130px }
+.docker-project-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; margin-bottom:22px }
+.docker-project-card { min-width:0 }.docker-project-header { align-items:flex-start }.docker-service-list { display:flex; flex-direction:column; gap:12px }
+.docker-service-row { padding:14px; border:1px solid var(--line); border-radius:14px; background:var(--surface-2) }
+.docker-service-title { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px }
+.docker-service-title b { display:block; font-size:14px }.docker-service-title span { display:block; margin-top:4px; color:var(--muted); font-size:11px }
+.docker-mini-container-list { display:flex; flex-direction:column; gap:6px }.docker-mini-container { display:flex; align-items:center; gap:8px; min-width:0; width:100%; padding:9px 10px; border:1px solid transparent; border-radius:9px; color:var(--text); background:var(--surface); text-align:left }
+.docker-mini-container:hover { border-color:var(--primary); background:var(--primary-soft) }.docker-mini-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px }
+.docker-state-dot { display:inline-block; width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:var(--muted) }.docker-state-dot.running { background:var(--green); box-shadow:0 0 0 4px rgba(43,182,115,.12) }.docker-state-dot.restarting { background:var(--orange) }.docker-state-dot.dead { background:var(--red) }
+.docker-table-panel { padding:0; overflow:hidden; margin-bottom:22px }.docker-table { --el-table-row-hover-bg-color:var(--surface-2) }.docker-name-cell { display:flex; align-items:center; gap:10px; min-width:0 }.docker-name-cell b,.docker-name-cell small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }.docker-name-cell small { color:var(--muted); margin-top:4px; font-size:11px }
+.docker-audit-panel { margin-bottom:22px }.docker-audit-table { width:100% }
+.docker-detail-head { display:flex; flex-direction:column; gap:14px; padding-bottom:18px; border-bottom:1px solid var(--line) }.docker-detail-head > div:first-child { display:flex; align-items:center; gap:7px }.docker-action-row { display:flex; flex-wrap:wrap; gap:7px }.docker-protected-label { color:var(--orange); font-size:12px; font-weight:650 }
+.docker-detail-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin:18px 0 }.docker-detail-grid > div,.docker-meta-list > div { padding:12px; border-radius:11px; background:var(--surface-2) }.docker-detail-grid span,.docker-detail-grid b,.docker-meta-list span,.docker-meta-list b { display:block }.docker-detail-grid span,.docker-meta-list span { color:var(--muted); font-size:11px; margin-bottom:5px }.docker-detail-grid b,.docker-meta-list b { overflow-wrap:anywhere; font-size:12px }
+.docker-detail-section { margin-top:20px }.docker-detail-section-title { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; font-weight:750 }.docker-log-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px }.docker-log-panel { max-height:360px; overflow:auto; padding:12px; border:1px solid var(--line); border-radius:10px; background:#111522; color:#dbe5f2; font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace }.docker-log-line { display:grid; grid-template-columns:170px 55px 1fr; gap:8px; white-space:pre-wrap; word-break:break-word }.docker-log-line.stderr { color:#ffb4b8 }.docker-log-time { color:#8290a8 }.docker-log-stream { color:#8bc7ff }.docker-log-empty { display:block; padding:36px 10px; color:#8290a8; text-align:center }.docker-meta-list { display:flex; flex-direction:column; gap:8px }.docker-meta-list code { color:var(--text); font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; word-break:break-word }
+@media (max-width:1100px) { .docker-stat-grid { grid-template-columns:repeat(2,1fr) }.docker-project-grid { grid-template-columns:1fr }.docker-toolbar { align-items:stretch; flex-direction:column }.docker-filter-row { justify-content:flex-start } }
+@media (max-width:760px) { .docker-stat-grid { grid-template-columns:1fr 1fr; gap:10px }.docker-stat-grid .stat-card { min-height:130px; padding:16px }.docker-stat-grid .stat-value { font-size:24px }.docker-filter-row { display:grid; grid-template-columns:1fr 1fr; width:100% }.docker-keyword { width:auto; grid-column:1 / -1 }.docker-filter { width:auto }.docker-detail-grid { grid-template-columns:1fr }.docker-log-line { grid-template-columns:1fr; gap:0; padding:4px 0 }.docker-log-time,.docker-log-stream { display:inline; margin-right:8px }.docker-log-actions { justify-content:flex-start } }
+
 /* Screenshot fixes: keep branding readable and login inputs visually consistent. */
 .brand-copy span { font-size:13px; line-height:1.35; }
 .login-brand span { font-size:13px; line-height:1.35; }

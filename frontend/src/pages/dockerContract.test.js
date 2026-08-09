@@ -18,3 +18,13 @@ test('Docker API surface includes lifecycle and log methods', () => {
   assert.match(source, /dockerServiceAction/)
   assert.match(source, /dockerAuditLogs/)
 })
+
+test('Docker page exposes status, logs, actions, and protection guardrails', () => {
+  const source = readFileSync(new URL('./Docker.vue', import.meta.url), 'utf8')
+  assert.match(source, /Docker 管理/)
+  assert.match(source, /dockerOverview/)
+  assert.match(source, /实时跟随/)
+  assert.match(source, /confirm_name/)
+  assert.match(source, /streamDockerLogs/)
+  assert.match(source, /受保护容器不可删除/)
+})

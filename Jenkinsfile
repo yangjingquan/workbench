@@ -132,9 +132,9 @@ pipeline {
         sh '''
           set -eu
           test -f "$WORKSPACE/deploy/nginx/workbench.conf"
-          docker run --rm \
+          docker run --rm -i \
             -v /opt/jenkins/nginx/conf.d:/target \
-            alpine:3.20 sh -c 'cat > /target/workbench.conf' < "$WORKSPACE/deploy/nginx/workbench.conf"
+            alpine:3.20 sh -c 'if [ -f /target/workbench.conf ]; then mv /target/workbench.conf /target/workbench.conf.disabled; fi; cat > /target/000-workbench.conf' < "$WORKSPACE/deploy/nginx/workbench.conf"
           docker exec ai-shop-jenkins-proxy nginx -t
           docker exec ai-shop-jenkins-proxy nginx -s reload
         '''

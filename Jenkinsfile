@@ -12,7 +12,6 @@ pipeline {
 
   environment {
     DEPLOY_DIR = '/opt/shop/workbench'
-    HOST_WORKSPACE = '/opt/jenkins/jenkins_home/workspace/workbench'
   }
 
   stages {
@@ -47,15 +46,17 @@ pipeline {
       steps {
         sh '''
           set -eu
-          test -f "$HOST_WORKSPACE/docker-compose.yml"
-          test -f "$HOST_WORKSPACE/docker-manager/Dockerfile"
-          grep -Fq '  docker-manager:' "$HOST_WORKSPACE/docker-compose.yml"
-          source_build_id=$(git -C "$HOST_WORKSPACE" rev-parse --short HEAD)
+          test -f "$WORKSPACE/docker-compose.yml"
+          test -f "$WORKSPACE/docker-manager/Dockerfile"
+          grep -Fq '  docker-manager:' "$WORKSPACE/docker-compose.yml"
+          source_build_id=$(git -C "$WORKSPACE" rev-parse --short HEAD)
           test "$source_build_id" = "$WORKBENCH_BUILD_ID"
-          docker run --rm \
-            -v "$HOST_WORKSPACE:/source:ro" \
+          archive_file=$(mktemp)
+          trap 'rm -f "$archive_file"' EXIT
+          tar -C "$WORKSPACE" -cf "$archive_file" .
+          docker run --rm -i \
             -v "$DEPLOY_DIR:/target" \
-            alpine:3.20 sh -c 'cp -a /source/. /target/'
+            alpine:3.20 sh -c 'tar -C /target -xf -' < "$archive_file"
           test -f "$DEPLOY_DIR/docker-compose.yml"
           test -f "$DEPLOY_DIR/docker-manager/Dockerfile"
           grep -Fq '  docker-manager:' "$DEPLOY_DIR/docker-compose.yml"
@@ -130,10 +131,10 @@ pipeline {
       steps {
         sh '''
           set -eu
+          test -f "$WORKSPACE/deploy/nginx/workbench.conf"
           docker run --rm \
             -v /opt/jenkins/nginx/conf.d:/target \
-            -v "$HOST_WORKSPACE/deploy/nginx/workbench.conf:/source/workbench.conf:ro" \
-            alpine:3.20 sh -c 'cp /source/workbench.conf /target/workbench.conf'
+            alpine:3.20 sh -c 'cat > /target/workbench.conf' < "$WORKSPACE/deploy/nginx/workbench.conf"
           docker exec ai-shop-jenkins-proxy nginx -t
           docker exec ai-shop-jenkins-proxy nginx -s reload
         '''

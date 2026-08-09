@@ -137,7 +137,33 @@ npm run package:mac:x64     # Intel Mac
 - 数据看板：ECharts 工作量折线、Todo 完成率环图、工具使用频次柱状图及统计卡片。
 - 工具箱：JSON、Base64、时间戳、URL 的计算全部在浏览器本地执行；后端 `/api/tools/usage` 只接收使用日志，不处理工具内容。
 - 全局检索：统一检索工作记录、计划、待办、快捷链接。
+- Docker 管理：通过独立 `docker-manager` Agent 查看单服务器上的全部容器和 Compose 服务，查看实时日志，并执行启动、停止、重启、暂停、恢复、强制终止和删除；写操作会记录审计日志。
 - 公共 UI：提供 `BaseDialog`、`BaseSelect`、`StatusTag` 基础封装，业务页面同时使用 Element Plus 表单/弹窗能力。
+
+## Docker 管理部署
+
+Docker 管理页面位于登录后的「Docker 管理」。Compose 部署会启动一个内部
+`docker-manager` Agent，它是唯一挂载 `/var/run/docker.sock` 的服务，不发布
+宿主机端口。部署前请在服务器 `.env` 中设置随机的
+`DOCKER_MANAGER_TOKEN`，并检查 `DOCKER_PROTECTED_CONTAINERS`；浏览器不会接触
+Agent Token。
+
+验证部署配置和服务健康：
+
+```bash
+docker compose config
+docker compose up -d docker-manager workbench-api workbench-web
+curl -fsS http://127.0.0.1:18082/health
+```
+
+进入 Docker 管理页后，可以按 Compose 项目或容器筛选，打开容器详情查看日志，
+并对非受保护容器执行生命周期操作。删除和强制终止需要输入完整容器名称；
+`workbench-api`、`workbench-web`、`docker-manager` 和 `xp-mysql` 默认禁止删除。
+日志不写入数据库，只有控制操作和结果进入审计表。回滚时只切换 Agent/API
+镜像，不删除容器、网络、Volume 或数据库数据。
+
+浏览器使用的后端接口包括 `/api/docker/overview` 和
+`/api/docker/containers/{id}/logs`；这些接口仍受现有 JWT 登录保护。
 
 ## 测试与验证
 

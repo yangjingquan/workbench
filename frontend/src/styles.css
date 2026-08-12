@@ -4401,3 +4401,54 @@ html.dark .plans-toolbar { background: rgba(24, 27, 41, .82); }
   flex: 0 0 48px;
   width: 48px;
 }
+
+/* Accounting detail filters keep the date range visible without taking over
+   the panel heading, then stack cleanly on narrow screens. */
+.account-records-header {
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+.account-records-filters {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+.account-record-date-filter {
+  width: 150px !important;
+}
+.account-records-filter-separator {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.account-records-filter-reset {
+  min-height: 36px;
+  padding-inline: 4px;
+}
+
+@media (max-width: 760px) {
+  .account-records-header {
+    display: block;
+  }
+  .account-records-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+    gap: 8px;
+    width: 100%;
+    margin-top: 12px;
+  }
+  .account-record-date-filter {
+    width: 100% !important;
+    min-width: 0;
+  }
+  .account-records-filter-separator {
+    display: grid;
+    place-items: center;
+  }
+  .account-records-filter-reset {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}

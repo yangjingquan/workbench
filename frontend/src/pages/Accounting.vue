@@ -17,7 +17,7 @@
             </el-radio-group>
           </el-form-item>
           <el-form-item label="金额">
-            <el-input-number v-model="form.amount" class="account-amount-input" :min="0.01" :precision="2" :step="10" controls-position="right" style="width:100%" />
+            <el-input-number v-model="form.amount" class="account-amount-input" :min="0.01" :precision="2" :step="10" controls-position="right" placeholder="请输入金额" style="width:100%" />
           </el-form-item>
         </div>
         <div class="two-col">
@@ -78,7 +78,15 @@
   </div>
 
   <div class="panel account-records-panel">
-    <div class="panel-header"><div><div class="panel-title">账目明细</div><div class="panel-subtitle">{{ summary.start }} 至 {{ summary.end }}</div></div></div>
+    <div class="panel-header account-records-header">
+      <div><div class="panel-title">账目明细</div><div class="panel-subtitle">{{ entryDateRangeLabel }}</div></div>
+      <div class="account-records-filters" aria-label="账目明细时间筛选">
+        <el-date-picker v-model="entryStartDate" type="date" value-format="YYYY-MM-DD" class="account-record-date-filter" placeholder="开始时间" :disabled-date="disableEntryStartDate" @change="applyEntryDateFilter" />
+        <span class="account-records-filter-separator">至</span>
+        <el-date-picker v-model="entryEndDate" type="date" value-format="YYYY-MM-DD" class="account-record-date-filter" placeholder="截止时间" :disabled-date="disableEntryEndDate" @change="applyEntryDateFilter" />
+        <el-button v-if="entryStartDate || entryEndDate" class="account-records-filter-reset" link @click="resetEntryDateFilter">重置</el-button>
+      </div>
+    </div>
     <div class="desktop-accounting-table"><el-table :data="entries" size="small">
       <el-table-column prop="entry_date" label="日期" width="130" />
       <el-table-column label="类型" width="100"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '进账' : '支出' }}</span></template></el-table-column>
@@ -124,12 +132,16 @@ function yearValue(date) { return String(date.getFullYear()) }
 function formatMoney(value) { return Number(value || 0).toFixed(2) }
 
 const now = new Date()
-const form = reactive({ entry_type: 'expense', amount: 0, category: '', note: '', entry_date: dateValue(now) })
+const form = reactive({ entry_type: 'expense', amount: null, category: '', note: '', entry_date: dateValue(now) })
 const categoryForm = reactive({ entry_type: 'expense', name: '' })
 const categories = ref([]); const entries = ref([]); const entryPage = ref(1); const entryPageSize = ref(20); const entryTotal = ref(0); const categoryDialog = ref(false); const entryLoading = ref(false); const editingEntryId = ref(null)
 const statPeriod = ref('month'); const statAnchor = ref(monthValue(now))
+const entryStartDate = ref(''); const entryEndDate = ref('')
 const summary = ref({ start: '', end: '', total_income: 0, total_expense: 0, balance: 0, by_category: [], trend: [] })
 const currentCategories = computed(() => categories.value.filter(item => item.entry_type === form.entry_type))
+const entryDateRangeLabel = computed(() => entryStartDate.value || entryEndDate.value
+  ? `${entryStartDate.value || '不限'} 至 ${entryEndDate.value || '不限'}`
+  : `${summary.value.start || '不限'} 至 ${summary.value.end || '不限'}`)
 
 function syncCategory() { if (!currentCategories.value.some(item => item.name === form.category)) form.category = currentCategories.value[0]?.name || '' }
 async function loadCategories() { categories.value = (await api.accountCategories()).data || []; syncCategory() }
@@ -140,7 +152,8 @@ async function loadSummary() {
   await loadEntries()
 }
 async function loadEntries() {
-  const data = (await api.accountEntries({ start: summary.value.start, end: summary.value.end, page: entryPage.value, page_size: entryPageSize.value })).data || {}
+  const hasCustomDateFilter = entryStartDate.value || entryEndDate.value
+  const data = (await api.accountEntries({ start: hasCustomDateFilter ? entryStartDate.value || undefined : summary.value.start, end: hasCustomDateFilter ? entryEndDate.value || undefined : summary.value.end, page: entryPage.value, page_size: entryPageSize.value })).data || {}
   if (Array.isArray(data)) {
     entries.value = data
     entryTotal.value = data.length
@@ -153,6 +166,17 @@ async function loadEntries() {
     await loadEntries()
   }
 }
+function disableEntryStartDate(date) { return entryEndDate.value ? dateValue(date) > entryEndDate.value : false }
+function disableEntryEndDate(date) { return entryStartDate.value ? dateValue(date) < entryStartDate.value : false }
+function applyEntryDateFilter() {
+  entryPage.value = 1
+  loadEntries()
+}
+function resetEntryDateFilter() {
+  entryStartDate.value = ''
+  entryEndDate.value = ''
+  applyEntryDateFilter()
+}
 function handlePageSizeChange(size) {
   entryPageSize.value = size
   entryPage.value = 1
@@ -161,10 +185,10 @@ function handlePageSizeChange(size) {
 async function saveEntry() {
   if (!form.amount || form.amount <= 0 || !form.category || !form.entry_date) return ElMessage.warning('请填写金额、分类和日期')
   entryLoading.value = true
-  try { if (editingEntryId.value) await api.updateAccountEntry(editingEntryId.value, { ...form }); else await api.accountEntry({ ...form }); editingEntryId.value = null; form.amount = 0; form.note = ''; await loadSummary(); ElMessage.success('账目已保存') } finally { entryLoading.value = false }
+  try { if (editingEntryId.value) await api.updateAccountEntry(editingEntryId.value, { ...form }); else await api.accountEntry({ ...form }); editingEntryId.value = null; form.amount = null; form.note = ''; await loadSummary(); ElMessage.success('账目已保存') } finally { entryLoading.value = false }
 }
 function startEditEntry(entry) { editingEntryId.value = entry.id; Object.assign(form, { entry_type: entry.entry_type, amount: entry.amount, category: entry.category, note: entry.note || '', entry_date: entry.entry_date }); nextTick(() => { form.category = entry.category }); document.querySelector('.content-scroll')?.scrollTo({ top: 0, behavior: 'smooth' }) }
-function cancelEditEntry() { editingEntryId.value = null; form.amount = 0; form.note = ''; syncCategory() }
+function cancelEditEntry() { editingEntryId.value = null; form.amount = null; form.note = ''; syncCategory() }
 async function removeEntry(id) {
   await ElMessageBox.confirm('确定删除这笔账目吗？', '删除确认', { type: 'warning' })
   await api.deleteAccountEntry(id); if (editingEntryId.value === id) cancelEditEntry(); await loadSummary(); ElMessage.success('账目已删除')

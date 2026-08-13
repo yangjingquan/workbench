@@ -60,52 +60,54 @@
     </div>
   </div>
 
-  <div class="panel account-category-panel">
-    <div class="panel-header"><div><div class="panel-title">分类统计</div><div class="panel-subtitle">当前统计范围内各分类汇总</div></div></div>
-    <div class="desktop-accounting-table"><el-table :data="summary.by_category" size="small">
-      <el-table-column prop="category" label="分类" />
-      <el-table-column label="类型" width="100"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '进账' : '支出' }}</span></template></el-table-column>
-      <el-table-column label="金额" width="150"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">¥ {{ formatMoney(scope.row.total) }}</span></template></el-table-column>
-      <el-table-column prop="count" label="笔数" width="100" />
-    </el-table></div>
-    <div class="mobile-accounting-list">
-      <article v-for="item in summary.by_category" :key="`${item.category}-${item.entry_type}`" class="mobile-category-card mobile-accounting-card">
-        <div class="mobile-accounting-card-header"><b>{{ item.category }}</b><span :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '进账' : '支出' }}</span></div>
-        <div class="mobile-accounting-card-stats"><div><span>金额</span><b :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">¥ {{ formatMoney(item.total) }}</b></div><div><span>笔数</span><b>{{ item.count }}</b></div></div>
-      </article>
-      <el-empty v-if="!summary.by_category.length" description="当前期间暂无分类统计" />
-    </div>
-  </div>
-
-  <div class="panel account-records-panel">
-    <div class="panel-header account-records-header">
-      <div><div class="panel-title">账目明细</div><div class="panel-subtitle">{{ entryDateRangeLabel }}</div></div>
-      <div class="account-records-filters" aria-label="账目明细时间筛选">
-        <el-date-picker v-model="entryStartDate" type="date" value-format="YYYY-MM-DD" class="account-record-date-filter" placeholder="开始时间" :disabled-date="disableEntryStartDate" @change="applyEntryDateFilter" />
-        <span class="account-records-filter-separator">至</span>
-        <el-date-picker v-model="entryEndDate" type="date" value-format="YYYY-MM-DD" class="account-record-date-filter" placeholder="截止时间" :disabled-date="disableEntryEndDate" @change="applyEntryDateFilter" />
-        <el-button v-if="entryStartDate || entryEndDate" class="account-records-filter-reset" link @click="resetEntryDateFilter">重置</el-button>
+  <div class="accounting-lower-grid">
+    <div class="panel account-category-panel">
+      <div class="panel-header"><div><div class="panel-title">分类统计</div><div class="panel-subtitle">当前统计范围内各分类汇总</div></div></div>
+      <div class="desktop-accounting-table"><el-table :data="summary.by_category" size="small">
+        <el-table-column prop="category" label="分类" />
+        <el-table-column label="类型" width="100"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '进账' : '支出' }}</span></template></el-table-column>
+        <el-table-column label="金额" width="150"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">¥ {{ formatMoney(scope.row.total) }}</span></template></el-table-column>
+        <el-table-column prop="count" label="笔数" width="100" />
+      </el-table></div>
+      <div class="mobile-accounting-list">
+        <article v-for="item in summary.by_category" :key="`${item.category}-${item.entry_type}`" class="mobile-category-card mobile-accounting-card">
+          <div class="mobile-accounting-card-header"><b>{{ item.category }}</b><span :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '进账' : '支出' }}</span></div>
+          <div class="mobile-accounting-card-stats"><div><span>金额</span><b :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">¥ {{ formatMoney(item.total) }}</b></div><div><span>笔数</span><b>{{ item.count }}</b></div></div>
+        </article>
+        <el-empty v-if="!summary.by_category.length" description="当前期间暂无分类统计" />
       </div>
     </div>
-    <div class="desktop-accounting-table"><el-table :data="entries" size="small">
-      <el-table-column prop="entry_date" label="日期" width="130" />
-      <el-table-column label="类型" width="100"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '进账' : '支出' }}</span></template></el-table-column>
-      <el-table-column prop="category" label="分类" width="150" />
-      <el-table-column prop="note" label="备注" min-width="180" show-overflow-tooltip />
-      <el-table-column label="金额" width="150"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(scope.row.amount) }}</span></template></el-table-column>
-      <el-table-column label="操作" width="110"><template #default="scope"><div class="account-row-actions"><el-button class="account-icon-button account-icon-button-edit" link type="primary" :title="`编辑 ${scope.row.category} 账目`" :aria-label="`编辑 ${scope.row.category} 账目`" @click="startEditEntry(scope.row)"><el-icon><EditPen /></el-icon></el-button><el-button class="account-icon-button account-icon-button-delete" link type="danger" :title="`删除 ${scope.row.category} 账目`" :aria-label="`删除 ${scope.row.category} 账目`" @click="removeEntry(scope.row.id)"><el-icon><Delete /></el-icon></el-button></div></template></el-table-column>
-      <template #empty><el-empty description="当前期间暂无账目" /></template>
-    </el-table></div>
-    <div class="mobile-accounting-list">
-      <article v-for="item in entries" :key="item.id" class="mobile-entry-card mobile-accounting-card">
-        <div class="mobile-accounting-card-header"><span>{{ item.entry_date }}</span><span :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '进账' : '支出' }}</span></div>
-        <div class="mobile-entry-category"><span>分类</span><b>{{ item.category }}</b></div>
-        <p v-if="item.note" class="mobile-entry-note">{{ item.note }}</p>
-        <div class="mobile-entry-footer"><b :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(item.amount) }}</b><span class="account-row-actions"><el-button class="account-icon-button account-icon-button-edit" link type="primary" title="编辑账目" aria-label="编辑账目" @click="startEditEntry(item)"><el-icon><EditPen /></el-icon></el-button><el-button class="account-icon-button account-icon-button-delete" link type="danger" title="删除账目" aria-label="删除账目" @click="removeEntry(item.id)"><el-icon><Delete /></el-icon></el-button></span></div>
-      </article>
-      <el-empty v-if="!entries.length" description="当前期间暂无账目" />
+
+    <div class="panel account-records-panel">
+      <div class="panel-header account-records-header">
+        <div><div class="panel-title">账目明细</div><div class="panel-subtitle">{{ entryDateRangeLabel }}</div></div>
+        <div class="account-records-filters" aria-label="账目明细时间筛选">
+          <el-date-picker v-model="entryStartDate" type="date" value-format="YYYY-MM-DD" class="account-record-date-filter" placeholder="开始时间" :disabled-date="disableEntryStartDate" @change="applyEntryDateFilter" />
+          <span class="account-records-filter-separator">至</span>
+          <el-date-picker v-model="entryEndDate" type="date" value-format="YYYY-MM-DD" class="account-record-date-filter" placeholder="截止时间" :disabled-date="disableEntryEndDate" @change="applyEntryDateFilter" />
+          <el-button v-if="entryStartDate || entryEndDate" class="account-records-filter-reset" link @click="resetEntryDateFilter">重置</el-button>
+        </div>
+      </div>
+      <div class="desktop-accounting-table"><el-table :data="entries" size="small">
+        <el-table-column prop="entry_date" label="日期" width="130" />
+        <el-table-column label="类型" width="100"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '进账' : '支出' }}</span></template></el-table-column>
+        <el-table-column prop="category" label="分类" width="150" />
+        <el-table-column prop="note" label="备注" min-width="180" show-overflow-tooltip />
+        <el-table-column label="金额" width="150"><template #default="scope"><span :class="scope.row.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ scope.row.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(scope.row.amount) }}</span></template></el-table-column>
+        <el-table-column label="操作" width="110"><template #default="scope"><div class="account-row-actions"><el-button class="account-icon-button account-icon-button-edit" link type="primary" :title="`编辑 ${scope.row.category} 账目`" :aria-label="`编辑 ${scope.row.category} 账目`" @click="startEditEntry(scope.row)"><el-icon><EditPen /></el-icon></el-button><el-button class="account-icon-button account-icon-button-delete" link type="danger" :title="`删除 ${scope.row.category} 账目`" :aria-label="`删除 ${scope.row.category} 账目`" @click="removeEntry(scope.row.id)"><el-icon><Delete /></el-icon></el-button></div></template></el-table-column>
+        <template #empty><el-empty description="当前期间暂无账目" /></template>
+      </el-table></div>
+      <div class="mobile-accounting-list">
+        <article v-for="item in entries" :key="item.id" class="mobile-entry-card mobile-accounting-card">
+          <div class="mobile-accounting-card-header"><span>{{ item.entry_date }}</span><span :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '进账' : '支出' }}</span></div>
+          <div class="mobile-entry-category"><span>分类</span><b>{{ item.category }}</b></div>
+          <p v-if="item.note" class="mobile-entry-note">{{ item.note }}</p>
+          <div class="mobile-entry-footer"><b :class="item.entry_type === 'income' ? 'income-text' : 'expense-text'">{{ item.entry_type === 'income' ? '+' : '-' }}¥ {{ formatMoney(item.amount) }}</b><span class="account-row-actions"><el-button class="account-icon-button account-icon-button-edit" link type="primary" title="编辑账目" aria-label="编辑账目" @click="startEditEntry(item)"><el-icon><EditPen /></el-icon></el-button><el-button class="account-icon-button account-icon-button-delete" link type="danger" title="删除账目" aria-label="删除账目" @click="removeEntry(item.id)"><el-icon><Delete /></el-icon></el-button></span></div>
+        </article>
+        <el-empty v-if="!entries.length" description="当前期间暂无账目" />
+      </div>
+      <div class="account-pagination"><el-pagination v-model:current-page="entryPage" v-model:page-size="entryPageSize" :page-sizes="[10, 20, 50, 100]" layout="total, sizes, prev, pager, next, jumper" :total="entryTotal" @current-change="loadEntries" @size-change="handlePageSizeChange" /></div>
     </div>
-    <div class="account-pagination"><el-pagination v-model:current-page="entryPage" v-model:page-size="entryPageSize" :page-sizes="[10, 20, 50, 100]" layout="total, sizes, prev, pager, next, jumper" :total="entryTotal" @current-change="loadEntries" @size-change="handlePageSizeChange" /></div>
   </div>
 
   <el-dialog v-model="categoryDialog" title="管理记账分类" width="460px">

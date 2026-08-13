@@ -7,6 +7,7 @@ const source = readFileSync(new URL('../pages/Accounting.vue', import.meta.url),
 test('accounting exposes desktop table wrappers and mobile card lists', () => {
   assert.equal((source.match(/desktop-accounting-table/g) || []).length, 2)
   assert.equal((source.match(/mobile-accounting-list/g) || []).length, 2)
+  assert.match(source, /<div class="accounting-lower-grid">[\s\S]*account-category-panel[\s\S]*account-records-panel[\s\S]*<\/div>/)
   assert.match(source, /mobile-category-card/)
   assert.match(source, /mobile-entry-card/)
 })

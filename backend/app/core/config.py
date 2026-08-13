@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "please-change-this-in-production"
     access_token_expire_minutes: int = 1440
     cors_origins: str = "http://localhost:5173,http://localhost:5174,null"
+    workbench_build_id: str = "dev"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
 
     @property

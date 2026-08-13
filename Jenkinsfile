@@ -12,7 +12,6 @@ pipeline {
 
   environment {
     DEPLOY_DIR = '/opt/shop/workbench'
-    HOST_WORKSPACE = '/opt/jenkins/jenkins_home/workspace/workbench'
   }
 
   stages {
@@ -48,9 +47,14 @@ pipeline {
         sh '''
           set -eu
           docker run --rm \
-            -v "$HOST_WORKSPACE:/source:ro" \
+            -v "$WORKSPACE:/source:ro" \
             -v "$DEPLOY_DIR:/target" \
-            alpine:3.20 sh -c 'cp -a /source/. /target/'
+            alpine:3.20 sh -c 'find /target -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +; cp -a /source/. /target/'
+          DEPLOYED_COMMIT=$(git -C "$DEPLOY_DIR" rev-parse --short HEAD)
+          if [ "$DEPLOYED_COMMIT" != "$WORKBENCH_BUILD_ID" ]; then
+            echo "Deployment source mismatch: expected $WORKBENCH_BUILD_ID, got $DEPLOYED_COMMIT"
+            exit 1
+          fi
           if [ ! -f "$DEPLOY_DIR/.env" ]; then
             set +x
             umask 077
@@ -105,8 +109,8 @@ pipeline {
           set -eu
           docker run --rm \
             -v /opt/jenkins/nginx/conf.d:/target \
-            -v "$HOST_WORKSPACE/deploy/nginx/workbench.conf:/source/workbench.conf:ro" \
-            alpine:3.20 sh -c 'cp /source/workbench.conf /target/workbench.conf'
+            -v "$WORKSPACE/deploy/nginx/workbench.conf:/source/workbench.conf:ro" \
+            alpine:3.20 sh -c 'rm -f /target/000-workbench.conf; cp /source/workbench.conf /target/workbench.conf'
           docker exec ai-shop-jenkins-proxy nginx -t
           docker exec ai-shop-jenkins-proxy nginx -s reload
         '''
@@ -160,6 +164,7 @@ pipeline {
           fi
           check_contains 'API proxy HTTP status' '__HTTP_STATUS__=200' "$API_RESPONSE"
           check_contains 'API proxy health payload' '"code":0' "$API_RESPONSE"
+          check_contains 'API proxy build marker' "\"build_id\":\"$BUILD_ID\"" "$API_RESPONSE"
         '''
       }
     }

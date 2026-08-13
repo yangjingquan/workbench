@@ -47,4 +47,4 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"code": 0, "msg": "ok", "data": {"service": "dev-workbench"}}
+    return {"code": 0, "msg": "ok", "data": {"service": "dev-workbench", "build_id": settings.workbench_build_id}}

@@ -46,10 +46,8 @@ pipeline {
       steps {
         sh '''
           set -eu
-          docker run --rm \
-            -v "$WORKSPACE:/source:ro" \
-            -v "$DEPLOY_DIR:/target" \
-            alpine:3.20 sh -c 'find /target -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +; cp -a /source/. /target/'
+          find "$DEPLOY_DIR" -mindepth 1 -maxdepth 1 ! -name .env -exec rm -rf {} +
+          cp -a "$WORKSPACE/." "$DEPLOY_DIR/"
           DEPLOYED_COMMIT=$(git -C "$DEPLOY_DIR" rev-parse --short HEAD)
           if [ "$DEPLOYED_COMMIT" != "$WORKBENCH_BUILD_ID" ]; then
             echo "Deployment source mismatch: expected $WORKBENCH_BUILD_ID, got $DEPLOYED_COMMIT"
@@ -107,10 +105,10 @@ pipeline {
       steps {
         sh '''
           set -eu
-          docker run --rm \
+          docker run --rm -i \
             -v /opt/jenkins/nginx/conf.d:/target \
-            -v "$WORKSPACE/deploy/nginx/workbench.conf:/source/workbench.conf:ro" \
-            alpine:3.20 sh -c 'rm -f /target/000-workbench.conf; cp /source/workbench.conf /target/workbench.conf'
+            alpine:3.20 sh -c 'rm -f /target/000-workbench.conf; cat > /target/workbench.conf' \
+            < "$DEPLOY_DIR/deploy/nginx/workbench.conf"
           docker exec ai-shop-jenkins-proxy nginx -t
           docker exec ai-shop-jenkins-proxy nginx -s reload
         '''

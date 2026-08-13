@@ -31,7 +31,7 @@
           </el-form-item>
         </div>
         <el-form-item label="备注（可选）"><el-input v-model="form.note" placeholder="例如：午餐、项目奖金" /></el-form-item>
-        <el-button type="primary" :loading="entryLoading" @click="saveEntry">{{ editingEntryId ? '保存修改' : '保存账目' }}</el-button>
+        <el-button class="account-entry-submit" type="primary" :loading="entryLoading" @click="saveEntry">{{ editingEntryId ? '保存修改' : '保存账目' }}</el-button>
       </el-form>
     </div>
 

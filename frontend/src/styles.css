@@ -4311,6 +4311,7 @@ html.dark .plans-toolbar { background: rgba(24, 27, 41, .82); }
   .accounting-page .account-category-panel,
   .accounting-page .account-records-panel { border-radius: 16px; }
   .accounting-page .account-entry-form .two-col { grid-template-columns: 1fr; }
+  .accounting-page .account-entry-submit { width: 100%; }
   .account-entry-type-toggle,
   .account-period-toggle { width: 100%; }
   .account-entry-type-toggle .el-radio-button,

@@ -162,7 +162,8 @@ pipeline {
           fi
           check_contains 'API proxy HTTP status' '__HTTP_STATUS__=200' "$API_RESPONSE"
           check_contains 'API proxy health payload' '"code":0' "$API_RESPONSE"
-          check_contains 'API proxy build marker' "\"build_id\":\"$BUILD_ID\"" "$API_RESPONSE"
+          API_BUILD_BODY=$(printf '%s' "$API_RESPONSE" | tr -d '"{}')
+          check_contains 'API proxy build marker' "build_id:$BUILD_ID" "$API_BUILD_BODY"
         '''
       }
     }

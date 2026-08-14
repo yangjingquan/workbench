@@ -23,6 +23,7 @@ test('work records display hours as hours and minutes', () => {
   assert.match(records, /formatHours\(scope\.row\.hours\)/)
   assert.match(records, /formatHours\(row\.hours\)/)
   assert.match(records, /工时：\$\{formatHours\(x\.hours\)\}/)
+  assert.match(records, /prop="hours" label="工时" width="150"/)
 })
 
 test('memos and accounting expose edit and delete actions', () => {

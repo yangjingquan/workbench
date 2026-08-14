@@ -32,7 +32,7 @@
               <el-table-column prop="title" label="工作内容" min-width="180" />
               <el-table-column prop="content" label="复盘备注" min-width="220" show-overflow-tooltip />
               <el-table-column label="标签" width="160"><template #default="scope"><div class="records-table-tags"><el-tag v-for="tag in scope.row.tags || []" :key="tag" size="small" effect="plain">{{ tag }}</el-tag></div></template></el-table-column>
-              <el-table-column prop="hours" label="工时" width="112" align="center" header-align="center"><template #default="scope"><span class="records-hours"><el-icon class="records-hours-icon"><Clock /></el-icon><span>{{ formatHours(scope.row.hours) }}</span></span></template></el-table-column>
+              <el-table-column prop="hours" label="工时" width="150" align="center" header-align="center"><template #default="scope"><span class="records-hours"><el-icon class="records-hours-icon"><Clock /></el-icon><span>{{ formatHours(scope.row.hours) }}</span></span></template></el-table-column>
               <el-table-column label="操作" width="128" align="center" header-align="center"><template #default="scope"><div class="records-row-actions"><el-button class="records-action-button records-action-edit" link type="primary" title="编辑记录" aria-label="编辑记录" @click="openEdit(scope.row)"><el-icon><EditPen /></el-icon></el-button><el-popconfirm title="确认删除这条记录？" @confirm="remove(scope.row.id)"><template #reference><el-button class="records-action-button records-action-delete" link type="danger" title="删除记录" aria-label="删除记录"><el-icon><Delete /></el-icon></el-button></template></el-popconfirm></div></template></el-table-column>
             </el-table>
             <el-empty v-if="!rows.length" description="还没有工作记录，今天就从一条开始" />

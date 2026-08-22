@@ -183,6 +183,21 @@ class Memo(TimestampMixin, Base):
     content: Mapped[str] = mapped_column(Text)
 
 
+class ContactSubmission(TimestampMixin, Base):
+    """官网公开联系表单提交的需求信息。"""
+    __tablename__ = "contact_submission"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ip: Mapped[str] = mapped_column(String(45), default="")
+    name: Mapped[str] = mapped_column(String(120))
+    contact: Mapped[str] = mapped_column(String(255))
+    project_type: Mapped[str] = mapped_column(String(80), default="")
+    budget: Mapped[str] = mapped_column(String(80), default="")
+    timeline: Mapped[str] = mapped_column(String(80), default="")
+    materials: Mapped[str] = mapped_column(String(80), default="")
+    message: Mapped[str] = mapped_column(Text)
+    consent: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class ProjectMilestone(TimestampMixin, Base):
     __tablename__ = "project_milestone"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

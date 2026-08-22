@@ -91,7 +91,7 @@ import { useAppStore } from '../stores'
 import { api } from '../api/http'
 import ReminderPoll from '../components/ReminderPoll.vue'
 import { createMobileNavState, toggleMobileNav, closeMobileNav } from './mobileNav'
-import { Odometer, Calendar, Bell, List, Link, FolderOpened, Tools, Wallet, Memo, Setting, SwitchButton, Search, Moon, Sunny, DArrowLeft, DArrowRight, Menu, Close } from '@element-plus/icons-vue'
+import { Odometer, Calendar, Bell, List, Link, FolderOpened, Document, Tools, Wallet, Memo, Setting, SwitchButton, Search, Moon, Sunny, DArrowLeft, DArrowRight, Menu, Close } from '@element-plus/icons-vue'
 const app = useAppStore(); const route = useRoute(); const router = useRouter(); const isGlobalMemoRoute = computed(() => route.path === '/memos'); const searchOpen = ref(false); const keyword = ref(''); const results = ref(null)
 const mobileNav = reactive(createMobileNavState())
 const mobileMenuTrigger = ref(null)
@@ -128,7 +128,7 @@ function handleMobileNavKeydown(event) {
   if (!mobileNavPanel.value?.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus() }
 }
 watch(() => route.fullPath, closeMobileMenu)
-const mainNav = [{ path: '/dashboard', label: '总览看板', icon: Odometer }, { path: '/projects', label: '项目管理', icon: FolderOpened }, { path: '/records', label: '工作记录', icon: List }, { path: '/plans', label: '工作计划', icon: Calendar }, { path: '/reminders', label: '事件提醒', icon: Bell }, { path: '/todos', label: 'Todo 看板', icon: List }, { path: '/links', label: '快捷导航', icon: Link }]
+const mainNav = [{ path: '/dashboard', label: '总览看板', icon: Odometer }, { path: '/projects', label: '项目管理', icon: FolderOpened }, { path: '/records', label: '工作记录', icon: List }, { path: '/plans', label: '工作计划', icon: Calendar }, { path: '/reminders', label: '事件提醒', icon: Bell }, { path: '/todos', label: 'Todo 看板', icon: List }, { path: '/links', label: '快捷导航', icon: Link }, { path: '/contact-submissions', label: '需求列表', icon: Document }]
 const groupNames = { records: '工作记录', plans: '计划', todos: '待办', links: '链接', memos: '备忘录' }
 async function doSearch() { if (!keyword.value.trim()) return; results.value = (await api.search(keyword.value, { workspace_id: app.currentWorkspaceId || undefined, project_id: app.currentProjectId || undefined })).data }
 function goToSearchResult(type) { const target = { records: '/records', plans: '/plans', todos: '/todos', links: '/links', memos: '/memos' }[type]; if (!target) return; searchOpen.value = false; router.push(target) }

@@ -32,6 +32,7 @@ def ensure_schema():
         "quick_link": "INT NULL",
     }
     columns = {item["name"] for item in inspect(engine).get_columns("event_reminder")}
+    contact_columns = {item["name"] for item in inspect(engine).get_columns("contact_submission")}
     additions = {
         "schedule_type": "VARCHAR(20) NOT NULL DEFAULT 'once'",
         "time_of_day": "VARCHAR(8) NULL",
@@ -43,6 +44,8 @@ def ensure_schema():
     }
     timezone_added = "timezone" not in columns
     with engine.begin() as conn:
+        if "ip" not in contact_columns:
+            conn.execute(text("ALTER TABLE `contact_submission` ADD COLUMN ip VARCHAR(45) NOT NULL DEFAULT ''"))
         for table, ddl in project_tables.items():
             table_columns = {item["name"] for item in inspect(engine).get_columns(table)}
             if "project_id" not in table_columns:

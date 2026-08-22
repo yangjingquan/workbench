@@ -324,6 +324,32 @@ select { -webkit-tap-highlight-color: transparent; }
 .memo-item { padding: 15px 16px; border-radius: 14px; }
 .memo-item.active { background: var(--primary-soft); border-color: rgba(91, 92, 226, .36); }
 .memo-content { padding: 22px; border-radius: 16px; background: var(--surface-2); line-height: 1.85; }
+.contact-submissions-table-card { overflow: hidden; }
+.contact-submissions-table-card .el-table th.el-table__cell {
+  height: 58px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+.contact-submissions-table-card .el-table td.el-table__cell { font-size: 13px; }
+.contact-submissions-pagination { display: flex; justify-content: flex-end; align-items: center; padding: 18px 4px 0; }
+.contact-submission-card { padding: 18px; }
+.contact-submission-card-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.contact-submission-card-header span { overflow: hidden; color: var(--primary); font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.contact-submission-card-header strong { color: var(--text); font-size: 16px; }
+.contact-submission-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.contact-submission-message { margin: 14px 0 0; color: var(--text); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+.contact-submission-materials { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.contact-submission-ip { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.contact-submission-created-at { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+@media (max-width: 760px) {
+  .contact-submissions-pagination { justify-content: center; overflow: hidden; padding-inline: 0; }
+  .contact-submissions-pagination .el-pagination { width: 100%; justify-content: center; flex-wrap: nowrap; }
+  .contact-submissions-pagination .el-pagination__total,
+  .contact-submissions-pagination .el-pagination__jump { display: none; }
+  .contact-submissions-pagination .el-pagination__sizes { flex: 0 0 96px; width: 96px; margin-right: 4px; }
+  .contact-submissions-pagination .el-pagination__sizes .el-select { width: 96px !important; }
+}
 
 .settings-list { max-width: 860px; border-radius: 20px; box-shadow: var(--shadow); }
 .setting-row { min-height: 78px; padding: 20px 24px; }

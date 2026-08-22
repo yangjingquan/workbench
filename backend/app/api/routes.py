@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone as dt_timezone
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, desc, func, or_, select
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ from app.api.common import ok
 from app.api.deps import get_current_user
 from app.core.security import create_access_token, decrypt_login_password, hash_password, login_public_key, verify_password
 from app.db.session import get_db
-from app.models import AccountCategory, AccountEntry, EventReminder, Memo, Project, ProjectCommit, ProjectMilestone, ProjectVersion, QuickLink, SystemConfig, TodoSubtask, TodoTask, ToolUsageLog, User, WorkPlan, WorkRecord, Workspace
+from app.models import AccountCategory, AccountEntry, ContactSubmission, EventReminder, Memo, Project, ProjectCommit, ProjectMilestone, ProjectVersion, QuickLink, SystemConfig, TodoSubtask, TodoTask, ToolUsageLog, User, WorkPlan, WorkRecord, Workspace
 
 router = APIRouter(prefix="/api")
 DEFAULT_TIMEZONE = "Asia/Shanghai"
@@ -334,6 +334,17 @@ class MemoIn(BaseModel):
     content: str = Field(min_length=1)
 
 
+class ContactSubmissionIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    contact: str = Field(min_length=1, max_length=255)
+    project_type: str = Field(default="", max_length=80)
+    budget: str = Field(default="", max_length=80)
+    timeline: str = Field(default="", max_length=80)
+    materials: str = Field(default="", max_length=80)
+    message: str = Field(min_length=1, max_length=5000)
+    consent: bool
+
+
 class WorkspaceIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     kind: str = "personal"
@@ -388,6 +399,44 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
         raise HTTPException(401, "用户名或密码错误")
     token = create_access_token(user.id, user.token_version)
     return ok({"token": token, "user": dump(user, {"password_hash", "token_version"})})
+
+
+@router.post("/public/contact-submissions")
+def create_contact_submission(request: Request, payload: ContactSubmissionIn, db: Session = Depends(get_db)):
+    values = payload.model_dump()
+    for field in ("name", "contact", "project_type", "budget", "timeline", "materials", "message"):
+        values[field] = values[field].strip()
+    if not values["name"]:
+        raise HTTPException(400, "联系人不能为空")
+    if not values["contact"]:
+        raise HTTPException(400, "联系方式不能为空")
+    if not values["message"]:
+        raise HTTPException(400, "需求描述不能为空")
+    if not values["consent"]:
+        raise HTTPException(400, "请先同意隐私说明")
+
+    client_ip = request.client.host if request.client else ""
+    forwarded_for = request.headers.get("x-forwarded-for")
+    real_ip = request.headers.get("x-real-ip")
+    if client_ip in {"127.0.0.1", "::1"}:
+        client_ip = (forwarded_for or real_ip or client_ip).split(",")[0].strip()
+    row = ContactSubmission(ip=client_ip[:45], **values)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return ok({"id": row.id}, "需求信息已提交")
+
+
+@router.get("/contact-submissions")
+def list_contact_submissions(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    total = db.scalar(select(func.count(ContactSubmission.id))) or 0
+    rows = db.scalars(
+        select(ContactSubmission)
+        .order_by(desc(ContactSubmission.created_at), desc(ContactSubmission.id))
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    return ok({"items": [dump(row) for row in rows], "total": total, "page": page, "page_size": page_size})
 
 
 @router.get("/auth/public-key")

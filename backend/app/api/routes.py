@@ -2,16 +2,23 @@ from __future__ import annotations
 
 from calendar import monthrange
 from datetime import date, datetime, timedelta, timezone as dt_timezone
+import hashlib
+from ipaddress import ip_address
+import json
+import re
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, case, desc, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.common import ok
 from app.api.deps import get_current_user
+from app.core.config import settings
+from app.core.rate_limit import contact_rate_limiter
 from app.core.security import create_access_token, decrypt_login_password, hash_password, login_public_key, verify_password
 from app.db.session import get_db
 from app.models import AccountCategory, AccountEntry, ContactSubmission, EventReminder, Memo, Project, ProjectCommit, ProjectMilestone, ProjectVersion, QuickLink, SystemConfig, TodoSubtask, TodoTask, ToolUsageLog, User, WorkPlan, WorkRecord, Workspace
@@ -168,6 +175,32 @@ DEFAULT_WORKSPACES = [
 PROJECT_STATUSES = {"planning", "active", "paused", "completed", "archived"}
 MILESTONE_STATUSES = {"pending", "doing", "done"}
 VERSION_STATUSES = {"planned", "active", "released", "cancelled"}
+IDEMPOTENCY_KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{16,64}$")
+
+
+def _request_client_ip(request: Request) -> str:
+    peer = request.client.host if request.client else ""
+    try:
+        peer_address = ip_address(peer)
+    except ValueError:
+        peer_address = None
+    trusted_proxy = peer_address is not None and any(
+        peer_address in network for network in settings.trusted_proxy_networks
+    )
+    candidates = []
+    if trusted_proxy:
+        candidates.extend([
+            request.headers.get("cf-connecting-ip"),
+            request.headers.get("x-real-ip"),
+            (request.headers.get("x-forwarded-for") or "").split(",")[0],
+        ])
+    candidates.append(peer)
+    for candidate in candidates:
+        try:
+            return str(ip_address((candidate or "").strip()))
+        except ValueError:
+            continue
+    return "unknown"
 
 
 def _ensure_user_project_setup(db: Session, user_id: int) -> None:
@@ -403,6 +436,10 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
 
 @router.post("/public/contact-submissions")
 def create_contact_submission(request: Request, payload: ContactSubmissionIn, db: Session = Depends(get_db)):
+    idempotency_key = request.headers.get("idempotency-key", "").strip()
+    if not IDEMPOTENCY_KEY_RE.fullmatch(idempotency_key):
+        raise HTTPException(400, "请提供有效的 Idempotency-Key")
+
     values = payload.model_dump()
     for field in ("name", "contact", "project_type", "budget", "timeline", "materials", "message"):
         values[field] = values[field].strip()
@@ -415,15 +452,65 @@ def create_contact_submission(request: Request, payload: ContactSubmissionIn, db
     if not values["consent"]:
         raise HTTPException(400, "请先同意隐私说明")
 
-    client_ip = request.client.host if request.client else ""
-    forwarded_for = request.headers.get("x-forwarded-for")
-    real_ip = request.headers.get("x-real-ip")
-    if client_ip in {"127.0.0.1", "::1"}:
-        client_ip = (forwarded_for or real_ip or client_ip).split(",")[0].strip()
-    row = ContactSubmission(ip=client_ip[:45], **values)
+    request_hash = hashlib.sha256(
+        json.dumps(values, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    existing = db.scalar(select(ContactSubmission).where(ContactSubmission.idempotency_key == idempotency_key))
+    if existing:
+        if existing.request_hash == request_hash:
+            return ok({"id": existing.id}, "需求信息已提交")
+        raise HTTPException(409, "Idempotency-Key 已用于其他提交")
+
+    client_ip = _request_client_ip(request)
+    cooldown, retry_after = contact_rate_limiter.is_in_success_cooldown(client_ip)
+    if cooldown is True:
+        raise HTTPException(429, "提交过于频繁，请稍后再试", headers={"Retry-After": str(retry_after)})
+    if cooldown is None:
+        recent_success = db.scalar(
+            select(func.count(ContactSubmission.id)).where(
+                ContactSubmission.ip == client_ip,
+                ContactSubmission.created_at >= datetime.utcnow() - timedelta(seconds=contact_rate_limiter.SUCCESS_COOLDOWN_SECONDS),
+            )
+        ) or 0
+        if recent_success:
+            raise HTTPException(429, "提交过于频繁，请稍后再试", headers={"Retry-After": "60"})
+
+    allowed, retry_after = contact_rate_limiter.check_attempt(client_ip)
+    if allowed is False:
+        raise HTTPException(429, "请求过于频繁，请稍后再试", headers={"Retry-After": str(retry_after)})
+    if allowed is None:
+        recent_attempts = db.scalar(
+            select(func.count(ContactSubmission.id)).where(
+                ContactSubmission.ip == client_ip,
+                ContactSubmission.created_at >= datetime.utcnow() - timedelta(seconds=contact_rate_limiter.ATTEMPT_WINDOW_SECONDS),
+            )
+        ) or 0
+        if recent_attempts >= contact_rate_limiter.ATTEMPT_LIMIT:
+            raise HTTPException(429, "请求过于频繁，请稍后再试", headers={"Retry-After": "600"})
+
+    idempotency_status = contact_rate_limiter.reserve_idempotency(idempotency_key, request_hash)
+    if idempotency_status == "different":
+        raise HTTPException(409, "Idempotency-Key 已用于其他提交")
+    if idempotency_status == "same":
+        raise HTTPException(409, "该提交正在处理中，请勿重复提交")
+
+    row = ContactSubmission(
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+        ip=client_ip[:45],
+        **values,
+    )
     db.add(row)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing = db.scalar(select(ContactSubmission).where(ContactSubmission.idempotency_key == idempotency_key))
+        if existing and existing.request_hash == request_hash:
+            return ok({"id": existing.id}, "需求信息已提交")
+        raise HTTPException(409, "该提交已存在，请勿重复提交")
     db.refresh(row)
+    contact_rate_limiter.mark_success(client_ip)
     return ok({"id": row.id}, "需求信息已提交")
 
 

@@ -33,6 +33,8 @@ def ensure_schema():
     }
     columns = {item["name"] for item in inspect(engine).get_columns("event_reminder")}
     contact_columns = {item["name"] for item in inspect(engine).get_columns("contact_submission")}
+    contact_indexes = inspect(engine).get_indexes("contact_submission")
+    contact_unique_constraints = inspect(engine).get_unique_constraints("contact_submission")
     additions = {
         "schedule_type": "VARCHAR(20) NOT NULL DEFAULT 'once'",
         "time_of_day": "VARCHAR(8) NULL",
@@ -44,8 +46,20 @@ def ensure_schema():
     }
     timezone_added = "timezone" not in columns
     with engine.begin() as conn:
+        if "idempotency_key" not in contact_columns:
+            conn.execute(text("ALTER TABLE `contact_submission` ADD COLUMN idempotency_key VARCHAR(64) NULL"))
+        if "request_hash" not in contact_columns:
+            conn.execute(text("ALTER TABLE `contact_submission` ADD COLUMN request_hash VARCHAR(64) NULL"))
         if "ip" not in contact_columns:
             conn.execute(text("ALTER TABLE `contact_submission` ADD COLUMN ip VARCHAR(45) NOT NULL DEFAULT ''"))
+        if not any(item["name"] == "idx_contact_submission_ip_created_at" for item in contact_indexes):
+            conn.execute(text("CREATE INDEX `idx_contact_submission_ip_created_at` ON `contact_submission` (ip, created_at)"))
+        has_idempotency_unique = any(
+            item.get("unique") and item.get("column_names") == ["idempotency_key"]
+            for item in contact_indexes
+        ) or any(item.get("column_names") == ["idempotency_key"] for item in contact_unique_constraints)
+        if not has_idempotency_unique:
+            conn.execute(text("CREATE UNIQUE INDEX `uq_contact_submission_idempotency_key` ON `contact_submission` (idempotency_key)"))
         for table, ddl in project_tables.items():
             table_columns = {item["name"] for item in inspect(engine).get_columns(table)}
             if "project_id" not in table_columns:

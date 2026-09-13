@@ -187,6 +187,8 @@ class ContactSubmission(TimestampMixin, Base):
     """官网公开联系表单提交的需求信息。"""
     __tablename__ = "contact_submission"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     ip: Mapped[str] = mapped_column(String(45), default="")
     name: Mapped[str] = mapped_column(String(120))
     contact: Mapped[str] = mapped_column(String(255))

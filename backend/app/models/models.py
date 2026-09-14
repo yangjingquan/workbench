@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -61,6 +61,18 @@ class WorkRecord(TimestampMixin, Base):
     tags: Mapped[list] = mapped_column(JSON, default=list)
     task_id: Mapped[int | None] = mapped_column(ForeignKey("todo_task.id", ondelete="SET NULL"), nullable=True)
     project_id: Mapped[int | None] = mapped_column(ForeignKey("project.id", ondelete="SET NULL"), nullable=True, index=True)
+
+
+class WeightRecord(TimestampMixin, Base):
+    __tablename__ = "weight_record"
+    __table_args__ = (
+        UniqueConstraint("user_id", "record_date", "period", name="uq_weight_record_user_date_period"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"), index=True)
+    record_date: Mapped[date] = mapped_column(Date, index=True)
+    period: Mapped[str] = mapped_column(String(10))
+    weight: Mapped[float] = mapped_column(Float)
 
 
 class WorkPlan(TimestampMixin, Base):

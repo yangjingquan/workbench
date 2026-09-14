@@ -15,6 +15,7 @@ const routes = [
     { path: 'links', component: () => import('../pages/Links.vue'), meta: { title: '快捷导航' } },
     { path: 'contact-submissions', component: () => import('../pages/ContactSubmissions.vue'), meta: { title: '需求列表' } },
     { path: 'toolkit', component: () => import('../pages/Toolkit.vue'), meta: { title: '开发工具箱' } },
+    { path: 'weight-records', component: () => import('../pages/WeightRecords.vue'), meta: { title: '体重记录' } },
     { path: 'accounting', component: () => import('../pages/Accounting.vue'), meta: { title: '记账存钱' } },
     { path: 'memos', component: () => import('../pages/Memos.vue'), meta: { title: '备忘录' } },
     { path: 'profile', component: () => import('../pages/Profile.vue'), meta: { title: '个人中心' } },

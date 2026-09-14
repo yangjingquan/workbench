@@ -6,7 +6,7 @@ import hashlib
 from ipaddress import ip_address
 import json
 import re
-from typing import Any
+from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
@@ -21,7 +21,7 @@ from app.core.config import settings
 from app.core.rate_limit import contact_rate_limiter
 from app.core.security import create_access_token, decrypt_login_password, hash_password, login_public_key, verify_password
 from app.db.session import get_db
-from app.models import AccountCategory, AccountEntry, ContactSubmission, EventReminder, Memo, Project, ProjectCommit, ProjectMilestone, ProjectVersion, QuickLink, SystemConfig, TodoSubtask, TodoTask, ToolUsageLog, User, WorkPlan, WorkRecord, Workspace
+from app.models import AccountCategory, AccountEntry, ContactSubmission, EventReminder, Memo, Project, ProjectCommit, ProjectMilestone, ProjectVersion, QuickLink, SystemConfig, TodoSubtask, TodoTask, ToolUsageLog, User, WeightRecord, WorkPlan, WorkRecord, Workspace
 
 router = APIRouter(prefix="/api")
 DEFAULT_TIMEZONE = "Asia/Shanghai"
@@ -284,6 +284,12 @@ class WorkRecordIn(BaseModel):
     tags: list[str] = []
     task_id: int | None = None
     project_id: int | None = None
+
+
+class WeightRecordIn(BaseModel):
+    record_date: date
+    period: Literal["morning", "evening"]
+    weight: float = Field(gt=0, le=1000)
 
 
 class WorkPlanIn(BaseModel):
@@ -783,6 +789,64 @@ def delete_record(item_id: int, db: Session = Depends(get_db), user: User = Depe
     row = db.scalar(select(WorkRecord).where(WorkRecord.id == item_id, WorkRecord.user_id == user.id))
     if not row: raise HTTPException(404, "记录不存在")
     db.delete(row); db.commit(); return ok(msg="工作记录已删除")
+
+
+@router.get("/weight-records")
+def list_weight_records(start: date | None = None, end: date | None = None, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    query = select(WeightRecord).where(WeightRecord.user_id == user.id)
+    if start: query = query.where(WeightRecord.record_date >= start)
+    if end: query = query.where(WeightRecord.record_date <= end)
+    period_order = case((WeightRecord.period == "morning", 0), else_=1)
+    rows = db.scalars(query.order_by(desc(WeightRecord.record_date), period_order, desc(WeightRecord.id))).all()
+    return ok([dump(row) for row in rows])
+
+
+@router.post("/weight-records")
+def create_weight_record(payload: WeightRecordIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    existing = db.scalar(select(WeightRecord).where(
+        WeightRecord.user_id == user.id,
+        WeightRecord.record_date == payload.record_date,
+        WeightRecord.period == payload.period,
+    ))
+    if existing:
+        raise HTTPException(409, "当天该时段已有体重记录，请直接编辑")
+    row = WeightRecord(user_id=user.id, record_date=payload.record_date, period=payload.period, weight=round(payload.weight, 1))
+    try:
+        db.add(row); db.commit(); db.refresh(row)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "当天该时段已有体重记录，请直接编辑")
+    return ok(dump(row), "体重记录已保存")
+
+
+@router.put("/weight-records/{item_id}")
+def update_weight_record(item_id: int, payload: WeightRecordIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    row = db.scalar(select(WeightRecord).where(WeightRecord.id == item_id, WeightRecord.user_id == user.id))
+    if not row: raise HTTPException(404, "体重记录不存在")
+    conflict = db.scalar(select(WeightRecord).where(
+        WeightRecord.user_id == user.id,
+        WeightRecord.record_date == payload.record_date,
+        WeightRecord.period == payload.period,
+        WeightRecord.id != item_id,
+    ))
+    if conflict:
+        raise HTTPException(409, "当天该时段已有另一条体重记录")
+    row.record_date = payload.record_date
+    row.period = payload.period
+    row.weight = round(payload.weight, 1)
+    try:
+        db.commit(); db.refresh(row)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "当天该时段已有另一条体重记录")
+    return ok(dump(row), "体重记录已更新")
+
+
+@router.delete("/weight-records/{item_id}")
+def delete_weight_record(item_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    row = db.scalar(select(WeightRecord).where(WeightRecord.id == item_id, WeightRecord.user_id == user.id))
+    if not row: raise HTTPException(404, "体重记录不存在")
+    db.delete(row); db.commit(); return ok(msg="体重记录已删除")
 
 
 @router.get("/work-plans")

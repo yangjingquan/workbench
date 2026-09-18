@@ -2,6 +2,7 @@ pipeline {
   agent any
 
   options {
+    skipDefaultCheckout(true)
     disableConcurrentBuilds()
     timeout(time: 45, unit: 'MINUTES')
   }
@@ -33,7 +34,7 @@ pipeline {
         deleteDir()
         sh '''
           set -eu
-          git clone --depth 1 --single-branch --branch "$BRANCH" https://gh-proxy.com/https://github.com/yangjingquan/workbench.git .
+          git clone --depth 1 --single-branch --branch "$BRANCH" https://ghproxy.net/https://github.com/yangjingquan/workbench.git .
         '''
         script {
           env.WORKBENCH_BUILD_ID = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()

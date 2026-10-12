@@ -57,7 +57,7 @@ pipeline {
           if [ ! -f "$DEPLOY_DIR/.env" ]; then
             set +x
             umask 077
-            mysql_password=$(docker inspect xp-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^MYSQL_ROOT_PASSWORD=//p')
+            mysql_password=$(docker inspect shop-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^MYSQL_ROOT_PASSWORD=//p')
             test -n "$mysql_password"
             jwt_secret=$(openssl rand -hex 48)
             {
@@ -72,7 +72,7 @@ pipeline {
             set -x
           fi
           set +x
-          mysql_password=$(docker inspect xp-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^MYSQL_ROOT_PASSWORD=//p')
+          mysql_password=$(docker inspect shop-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^MYSQL_ROOT_PASSWORD=//p')
           test -n "$mysql_password"
           sed -i "s#^MYSQL_ROOT_PASSWORD=.*#MYSQL_ROOT_PASSWORD=$mysql_password#" "$DEPLOY_DIR/.env"
           unset mysql_password

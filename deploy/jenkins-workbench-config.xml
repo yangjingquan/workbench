@@ -121,8 +121,12 @@ pipeline {
             -v /opt/jenkins/nginx/conf.d:/target \
             alpine:3.20 sh -c 'rm -f /target/000-workbench.conf; cat > /target/workbench.conf' \
             < "$DEPLOY_DIR/deploy/nginx/workbench.conf"
-          docker exec ai-shop-jenkins-proxy nginx -t
-          docker exec ai-shop-jenkins-proxy nginx -s reload
+          docker run --rm --network jenkins_default \
+            --add-host host.docker.internal:host-gateway \
+            -v /opt/jenkins/nginx/conf.d:/etc/nginx/conf.d:ro \
+            -v /opt/jenkins/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
+            nginx:1.27-alpine nginx -t
+          docker kill --signal=HUP ai-shop-jenkins-proxy
         '''
       }
     }

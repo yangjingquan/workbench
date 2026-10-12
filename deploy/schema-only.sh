@@ -22,13 +22,13 @@ if grep -Eiq '^[[:space:]]*(INSERT|REPLACE|UPDATE|DELETE|TRUNCATE|DROP([[:space:
 fi
 
 set +x
-mysql_password=$(docker inspect xp-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^MYSQL_ROOT_PASSWORD=//p')
+mysql_password=$(docker inspect shop-mysql --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^MYSQL_ROOT_PASSWORD=//p')
 test -n "$mysql_password"
 
-until docker exec xp-mysql sh -c 'mysqladmin ping -h 127.0.0.1 -uroot -p"$1" --silent' sh "$mysql_password"; do
+until docker exec shop-mysql sh -c 'mysqladmin ping -h 127.0.0.1 -uroot -p"$1" --silent' sh "$mysql_password"; do
   sleep 3
 done
 
-docker exec -i xp-mysql sh -c 'mysql -uroot -p"$1" workbench' sh "$mysql_password" < "$schema_sql"
+docker exec -i shop-mysql sh -c 'mysql -uroot -p"$1" workbench' sh "$mysql_password" < "$schema_sql"
 unset mysql_password
 set -x
